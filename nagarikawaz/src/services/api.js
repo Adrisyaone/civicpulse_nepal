@@ -1,138 +1,79 @@
+import axios from 'axios'
 import { supabase } from './supabase'
 
 const BASE = import.meta.env.VITE_SHEETS_API_URL || ''
 
-// Get auth token
-async function getToken() {
+const http = axios.create({ baseURL: BASE, timeout: 30000 })
+
+http.interceptors.request.use(async (cfg) => {
   try {
     const { data: { session } } = await supabase.auth.getSession()
-    return session?.access_token || null
-  } catch { return null }
-}
+    if (session?.access_token) cfg.params = { ...cfg.params, token: session.access_token }
+  } catch {}
+  return cfg
+})
 
-// GET — for read operations (no body, params only)
-async function qGet(action, params = {}) {
-  const token = await getToken()
-  const url   = new URL(BASE)
-  url.searchParams.set('action', action)
-  if (token) url.searchParams.set('token', token)
-  Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, String(v))
-  })
-  const res = await fetch(url.toString())
-  if (!res.ok) throw { error: `HTTP ${res.status}` }
-  const data = await res.json()
-  if (data?.error) throw data
-  return data
-}
+http.interceptors.response.use(
+  (r) => r.data,
+  (err) => Promise.reject(err?.response?.data || { error: err?.message || 'Network error' })
+)
 
-// POST — for all write operations to avoid URL length limits and data truncation
-async function qPost(action, body = {}) {
-  const token = await getToken()
-  const url   = new URL(BASE)
-  url.searchParams.set('action', action)
-  if (token) url.searchParams.set('token', token)
-  const res = await fetch(url.toString(), {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(body),
-  })
-  if (!res.ok) throw { error: `HTTP ${res.status}` }
-  const data = await res.json()
-  if (data?.error) throw data
-  return data
-}
+const q = (action, params = {}) => http.get('', { params: { action, ...params } })
 
 // ── Reports ───────────────────────────────────────────────────────────────────
 export const reportsApi = {
-  list:   (p = {})          => qGet('getReports', p),
-  get:    (id)              => qGet('getReport', { id }),
-  create: (data)            => qPost('createReport', data),
-  update: (id, data)        => qPost('updateReport', { id, ...data }),
-  upvote: (id, userId)      => qPost('upvoteReport', { id, userId }),
-  nearby: (lat, lng, r=100) => qGet('getNearbyReports', { lat, lng, radius: r }),
-  stats:  (p = {})          => qGet('getDashboardStats', p),
+  list:   (p = {})       => q('getReports', p),
+  get:    (id)           => q('getReport', { id }),
+  create: (data)         => q('createReport', data),
+  update: (id, data)     => q('updateReport', { id, ...data }),
+  upvote: (id, userId)   => q('upvoteReport', { id, userId }),
+  nearby: (lat, lng, r = 100) => q('getNearbyReports', { lat, lng, radius: r }),
+  stats:  (p = {})       => q('getDashboardStats', p),
 }
 
 // ── Comments ──────────────────────────────────────────────────────────────────
 export const commentsApi = {
-  list:   (reportId) => qGet('getComments',  { reportId }),
-  create: (data)     => qPost('addComment',  data),
+  list:   (reportId) => q('getComments', { reportId }),
+  create: (data)     => q('addComment', data),
 }
 
 // ── Progress ──────────────────────────────────────────────────────────────────
 export const progressApi = {
-  list:   (reportId) => qGet('getProgress',  { reportId }),
-  create: (data)     => qPost('addProgress', data),
+  list:   (reportId) => q('getProgress', { reportId }),
+  create: (data)     => q('addProgress', data),
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 export const usersApi = {
-  list:       ()         => qGet('getUsers'),
-  get:        (id)       => qGet('getUser',        { id }),
-  upsert:     (data)     => qPost('upsertUser',    data),
-  updateRole: (id, data) => qPost('updateUserRole',{ id, ...data }),
+  list:       ()         => q('getUsers'),
+  get:        (id)       => q('getUser', { id }),
+  upsert:     (data)     => q('upsertUser', data),
+  updateRole: (id, data) => q('updateUserRole', { id, ...data }),
 }
 
 // ── AI ────────────────────────────────────────────────────────────────────────
 export const aiApi = {
-  generate: (data) => qPost('generateAIReport', data),
-  list:     ()     => qGet('listAIReports'),
+  generate: (data) => q('generateAIReport', data),
+  list:     ()     => q('listAIReports'),
 }
 
-export { qGet, qPost }
-
-// ── Photo upload ──────────────────────────────────────────────────────────────
-export async function uploadPhoto(file, reportId = 'temp') {
-  if (!file || !file.type.startsWith('image/')) throw new Error('Only image files are supported')
-  if (file.size > 10 * 1024 * 1024)              throw new Error('File too large — max 10 MB')
-
-  const compressed = await compressImage(file, 1200, 0.82)
-  const base64     = await fileToBase64(compressed)
-
-  return qPost('uploadPhoto', {
-    reportId,
-    fileName: file.name.replace(/[^a-zA-Z0-9._-]/g, '_'),
-    mimeType: compressed.type || file.type,
-    data:     base64,
-  })
-}
-
-async function fileToBase64(file) {
+// ── Photo upload (base64) ─────────────────────────────────────────────────────
+export function uploadPhoto(file, reportId = 'temp') {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
-    reader.onload  = (e) => resolve(e.target.result.split(',')[1])
-    reader.onerror = ()  => reject(new Error('Failed to read file'))
-    reader.readAsDataURL(file)
-  })
-}
-
-// Compress image to max width/height, keeping aspect ratio
-function compressImage(file, maxPx, quality) {
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.onload = () => {
-      let { width: w, height: h } = img
-      if (w <= maxPx && h <= maxPx) { resolve(file); return }
-
-      const scale = Math.min(maxPx / w, maxPx / h)
-      w = Math.round(w * scale)
-      h = Math.round(h * scale)
-
-      const canvas = document.createElement('canvas')
-      canvas.width  = w
-      canvas.height = h
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0, w, h)
-
-      canvas.toBlob(
-        (blob) => resolve(blob || file),
-        file.type === 'image/png' ? 'image/png' : 'image/jpeg',
-        quality
-      )
+    reader.onload = async (e) => {
+      try {
+        const result = await q('uploadPhoto', {
+          reportId,
+          fileName: file.name,
+          mimeType: file.type,
+          data:     e.target.result.split(',')[1],
+        })
+        resolve(result)
+      } catch (err) { reject(err) }
     }
-    img.onerror = () => resolve(file)
-    img.src = URL.createObjectURL(file)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
   })
 }
 

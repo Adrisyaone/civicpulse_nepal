@@ -24,53 +24,32 @@ export default function ReportCard({ report: r, compact = false }) {
   }
 
   return (
-    <motion.div layout initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0}}
+    <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
       className="card-hover overflow-hidden" onClick={() => navigate(`/report/${r.id}`)}>
-
-      {/* Photo strip */}
       {photoId && !compact && (
-        <div className="h-40 overflow-hidden bg-slate-800/50 relative">
+        <div className="h-36 overflow-hidden bg-slate-800">
           <img src={driveThumb(photoId, 400)} alt={title}
             className="w-full h-full object-cover"
-            onError={e => { e.target.parentElement.style.display='none' }} />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent" />
+            onError={(e) => { e.target.parentElement.style.display = 'none' }} />
         </div>
       )}
-
       <div className="p-4">
-        {/* Badges row */}
-        <div className="flex flex-wrap gap-1.5 mb-2.5">
+        <div className="flex flex-wrap gap-1.5 mb-2">
           <CategoryBadge category={r.category} />
           <SeverityBadge severity={r.severity} />
           <StatusBadge   status={r.status} />
-          {r.priority_score > 70 && (
-            <span className={cn('badge', r.priority_score >= 85
-              ? 'bg-red-500/15 text-red-400 border border-red-500/25'
-              : 'bg-orange-500/15 text-orange-400 border border-orange-500/25')}>
+          {r.priority_score > 0 && (
+            <span className={cn('badge', r.priority_score >= 80 ? 'bg-red-500/20 text-red-400' : 'bg-orange-500/20 text-orange-400')}>
               ⚡ {r.priority_score}
             </span>
           )}
         </div>
-
-        {/* Title */}
-        <h3 className="font-display font-semibold text-slate-100 text-sm mb-1.5 leading-snug">
-          {title || (lang === 'ne' ? 'शीर्षक छैन' : 'No title')}
-        </h3>
-
-        {/* Location tag */}
-        {(r.palika || r.district) && (
-          <div className="mb-2">
-            <WardTag palika={r.palika} wardNo={r.ward_no} district={r.district} />
-          </div>
-        )}
-
-        {/* Description */}
+        <h3 className="font-display font-semibold text-slate-100 text-sm mb-1.5 leading-snug">{title}</h3>
+        <div className="mb-2"><WardTag palika={r.palika} wardNo={r.ward_no} district={r.district} /></div>
         {!compact && desc && (
           <p className="text-slate-500 text-xs mb-3 leading-relaxed">{truncate(desc, 90)}</p>
         )}
-
-        {/* Progress bar */}
-        {progress > 0 && !compact && (
+        {!compact && progress > 0 && (
           <div className="mb-3">
             <div className="flex justify-between text-xs text-slate-600 mb-1">
               <span>{tr('progress')}</span>
@@ -79,23 +58,13 @@ export default function ReportCard({ report: r, compact = false }) {
             <ProgressBar value={progress} />
           </div>
         )}
-
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-800/50">
-          <span className="text-xs text-slate-600">{timeAgo(r.created_at)}</span>
+        <div className="flex items-center justify-between text-xs text-slate-600 mt-1">
+          <span>{timeAgo(r.created_at)}</span>
           <div className="flex items-center gap-3">
-            {r.comments_count > 0 && (
-              <span className="text-xs text-slate-600">💬 {r.comments_count}</span>
-            )}
-            <button
-              onClick={handleUpvote}
-              disabled={upvote.isPending}
-              className={cn(
-                'flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all',
-                'hover:bg-brand-900/40 hover:text-brand-400',
-                upvote.isPending ? 'opacity-50 cursor-not-allowed' : 'text-slate-500 active:scale-95'
-              )}>
-              👍 <span className="font-mono font-medium">{r.upvotes || 0}</span>
+            {r.comments_count > 0 && <span>💬 {r.comments_count}</span>}
+            <button onClick={handleUpvote} disabled={upvote.isPending}
+              className="flex items-center gap-1 hover:text-brand-400 transition-colors disabled:opacity-50">
+              👍 <span className="font-mono">{r.upvotes || 0}</span>
             </button>
           </div>
         </div>

@@ -52,41 +52,12 @@ export function useUpdateReport() {
 }
 
 export function useUpvoteReport() {
-  const qc      = useQueryClient()
+  const qc = useQueryClient()
   const { user } = useAuth()
-
   return useMutation({
-    mutationFn: async (id) => {
-      if (!user) throw new Error('login_required')
-      return reportsApi.upvote(id, user.id)
-    },
-    // Optimistic update — instantly shows +1 without waiting for server
-    onMutate: async (id) => {
-      await qc.cancelQueries({ queryKey: ['reports'] })
-      const prev = qc.getQueriesData({ queryKey: ['reports'] })
-      qc.setQueriesData({ queryKey: ['reports'] }, (old) => {
-        if (!Array.isArray(old)) return old
-        return old.map((r) =>
-          r.id === id ? { ...r, upvotes: (Number(r.upvotes) || 0) + 1 } : r
-        )
-      })
-      return { prev }
-    },
-    onSuccess: () => {
-      // Refetch to sync real server value
-      qc.invalidateQueries({ queryKey: ['reports'] })
-    },
-    onError: (err, _id, ctx) => {
-      // Roll back optimistic update
-      if (ctx?.prev) {
-        ctx.prev.forEach(([queryKey, data]) => qc.setQueryData(queryKey, data))
-      }
-      if (err?.message === 'login_required') {
-        toast.error('Please sign in to upvote / अपभोट गर्न लगइन गर्नुहोस्')
-      } else {
-        toast.error('Upvote failed — try again')
-      }
-    },
+    mutationFn: (id) => reportsApi.upvote(id, user?.id),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ['reports'] }),
+    onError:    () => toast.error('Upvote failed'),
   })
 }
 
@@ -143,30 +114,14 @@ export function usePhotoUpload() {
   const [fileIds,   setFileIds]   = useState([])
 
   const upload = async (files, reportId = 'temp') => {
-    if (!files?.length) return []
     setUploading(true)
-
-    const ids = []
-    for (const file of files) {
-      const toastId = toast.loading(`📸 Uploading ${file.name}…`)
-      try {
-        const result = await uploadPhoto(file, reportId)
-        if (result?.fileId) {
-          ids.push(result.fileId)
-          toast.success(`✓ Photo uploaded`, { id: toastId })
-        } else {
-          toast.error('Upload returned no file ID', { id: toastId })
-        }
-      } catch (err) {
-        const msg = err?.message || 'Upload failed'
-        toast.error(`📸 ${msg}`, { id: toastId, duration: 5000 })
-        console.error('Photo upload error:', err)
-      }
-    }
-
-    setFileIds((prev) => [...prev, ...ids])
-    setUploading(false)
-    return ids
+    try {
+      const results = await Promise.all(files.map((f) => uploadPhoto(f, reportId)))
+      const ids = results.map((r) => r?.fileId).filter(Boolean)
+      setFileIds((p) => [...p, ...ids])
+      return ids
+    } catch { toast.error('Photo upload failed'); return [] }
+    finally  { setUploading(false) }
   }
 
   return { upload, uploading, fileIds, setFileIds }
