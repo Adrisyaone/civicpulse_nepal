@@ -4,35 +4,35 @@ import { CATEGORIES, SEVERITIES, STATUSES, ROLES } from '../../utils/constants'
 import { useLang } from '../../context/LangContext'
 
 export function Spinner({ size = 'md', className = '' }) {
-  const s = { sm: 'w-4 h-4 border-2', md: 'w-6 h-6 border-2', lg: 'w-10 h-10 border-2', xl: 'w-16 h-16 border-[3px]' }[size]
-  return <div className={cn('animate-spin rounded-full border-slate-700 border-t-brand-500', s, className)} />
+  const s = { sm:'w-4 h-4 border-[1.5px]', md:'w-5 h-5 border-2', lg:'w-9 h-9 border-2', xl:'w-14 h-14 border-[3px]' }[size]
+  return <div className={cn('animate-spin rounded-full border-slate-700 border-t-brand-400', s, className)} />
 }
 
 export function LoadingScreen() {
   return (
-    <div className="fixed inset-0 bg-[#060e08] flex flex-col items-center justify-center gap-4 z-[9999]">
+    <div className="fixed inset-0 flex flex-col items-center justify-center gap-4 z-[9999]" style={{background:'#080f09'}}>
       <div className="relative w-16 h-16">
-        <div className="absolute inset-0 rounded-full border-[3px] border-brand-900 border-t-brand-500 animate-spin" />
-        <div className="absolute inset-0 flex items-center justify-center text-nepal-red text-xl font-bold">न</div>
+        <div className="absolute inset-0 rounded-full border-[3px] border-brand-900/50 border-t-brand-400 animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center text-xl font-bold" style={{color:'#DC143C'}}>न</div>
       </div>
       <div className="text-center">
-        <p className="font-display font-bold text-brand-400 text-lg">नागरिक आवाज</p>
-        <p className="text-slate-600 text-xs mt-1">लोड हुँदैछ…</p>
+        <p className="font-display font-bold text-brand-400 text-base">नागरिक आवाज</p>
+        <p className="text-slate-600 text-xs mt-0.5">NagarikAwaz</p>
       </div>
     </div>
   )
 }
 
 export function ShimmerCard({ h = 'h-24', className = '' }) {
-  return <div className={cn('shimmer rounded-xl border border-slate-800', h, className)} />
+  return <div className={cn('shimmer rounded-2xl', h, className)} />
 }
 
 export function CategoryBadge({ category }) {
   const { lang } = useLang()
   const c = CATEGORIES[category] || CATEGORIES.other
   return (
-    <span className={cn('badge border', c.bg, c.text, c.border)}>
-      <span className="text-xs">{c.icon}</span>
+    <span className={cn('badge', c.bg, c.text, 'border', c.border)}>
+      <span>{c.icon}</span>
       {lang === 'ne' ? c.np : c.en}
     </span>
   )
@@ -61,21 +61,25 @@ export function RoleBadge({ role }) {
   return <span className={cn('badge', r.bg, r.color)}>{lang === 'ne' ? r.np : r.en}</span>
 }
 
-export function ProgressBar({ value = 0, color = 'bg-brand-500', className = '' }) {
+export function ProgressBar({ value = 0, color = 'bg-brand-500' }) {
   return (
-    <div className={cn('w-full bg-slate-800 rounded-full h-2 overflow-hidden', className)}>
-      <div className={cn('h-full rounded-full transition-all duration-700', color)} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
+    <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+      <div className={cn('h-full rounded-full transition-all duration-700', color)}
+        style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
     </div>
   )
 }
 
-export function EmptyState({ icon = '📋', titleKey, title, action }) {
+export function EmptyState({ icon = '📋', titleKey, title, message, action }) {
   const { tr } = useLang()
   return (
-    <div className="flex flex-col items-center justify-center py-14 px-4 text-center">
-      <div className="text-5xl mb-4">{icon}</div>
-      <h3 className="font-display font-semibold text-lg text-slate-200 mb-2">{titleKey ? tr(titleKey) : title}</h3>
-      {action && <div className="mt-3">{action}</div>}
+    <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+      <div className="text-5xl mb-4 opacity-80">{icon}</div>
+      <h3 className="font-display font-semibold text-lg text-slate-200 mb-1">
+        {titleKey ? tr(titleKey) : title}
+      </h3>
+      {message && <p className="text-slate-500 text-sm max-w-xs mb-5">{message}</p>}
+      {action && <div>{action}</div>}
     </div>
   )
 }
@@ -86,12 +90,12 @@ export class ErrorBoundary extends React.Component {
   componentDidCatch(e, info) { console.error('[ErrorBoundary]', e, info) }
   render() {
     if (this.state.err) return (
-      <div className="min-h-screen flex items-center justify-center p-8 bg-[#060e08]">
-        <div className="card p-8 max-w-md text-center">
+      <div className="min-h-screen flex items-center justify-center p-8" style={{background:'#080f09'}}>
+        <div className="card p-8 max-w-md w-full text-center">
           <div className="text-5xl mb-4">⚠️</div>
-          <h2 className="font-display text-xl font-bold text-red-400 mb-2">केही गडबड भयो</h2>
+          <h2 className="font-display text-xl font-bold text-red-400 mb-2">Something went wrong</h2>
           <p className="text-slate-500 text-sm mb-6">{this.state.err.message}</p>
-          <button className="btn-primary" onClick={() => window.location.reload()}>पुनः लोड / Reload</button>
+          <button className="btn-primary" onClick={() => window.location.reload()}>Reload Page</button>
         </div>
       </div>
     )
@@ -99,18 +103,19 @@ export class ErrorBoundary extends React.Component {
   }
 }
 
-export function StatCard({ labelKey, value, icon, color = 'text-brand-400', loading }) {
+export function StatCard({ labelKey, value, icon, color = 'text-brand-400', loading, subtitle }) {
   const { tr } = useLang()
   return (
     <div className="stat-card">
-      <div className="flex items-center justify-between">
-        <span className="text-slate-500 text-xs uppercase tracking-wider">{tr(labelKey)}</span>
-        <span className="text-xl">{icon}</span>
+      <div className="flex items-start justify-between mb-2">
+        <span className="text-slate-500 text-xs uppercase tracking-wider font-medium">{tr(labelKey)}</span>
+        <span className="text-2xl opacity-80">{icon}</span>
       </div>
       {loading
-        ? <div className="shimmer h-8 w-20 rounded mt-1" />
-        : <div className={cn('font-display text-3xl font-bold mt-1', color)}>{value ?? '—'}</div>
+        ? <div className="shimmer h-9 w-20 rounded-lg" />
+        : <div className={cn('font-display text-3xl font-bold', color)}>{value ?? '—'}</div>
       }
+      {subtitle && <p className="text-xs text-slate-600 mt-0.5">{subtitle}</p>}
     </div>
   )
 }
@@ -120,11 +125,16 @@ export function Modal({ open, onClose, titleKey, title, children, width = 'max-w
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/72 backdrop-blur-sm" onClick={onClose} />
-      <div className={cn('relative card w-full animate-slide-up rounded-b-none sm:rounded-xl', width)}>
-        <div className="flex items-center justify-between p-5 border-b border-slate-800">
-          <h2 className="font-display font-semibold text-lg text-white">{titleKey ? tr(titleKey) : title}</h2>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-white text-2xl leading-none">×</button>
+      <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
+      <div className={cn('relative card-solid border border-slate-700/60 w-full animate-slide-up', 'rounded-t-2xl sm:rounded-2xl', width)}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+          <h2 className="font-display font-semibold text-lg text-white">
+            {titleKey ? tr(titleKey) : title}
+          </h2>
+          <button onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:text-white hover:bg-white/10 transition-all text-xl leading-none">
+            ×
+          </button>
         </div>
         {children}
       </div>
@@ -133,10 +143,14 @@ export function Modal({ open, onClose, titleKey, title, children, width = 'max-w
 }
 
 export function WardTag({ palika, wardNo, district }) {
-  if (!palika) return null
+  if (!palika && !district) return null
   return (
-    <span className="badge bg-brand-900/50 text-brand-400 border border-brand-800/40 font-mono text-xs">
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-brand-950/70 text-brand-400 border border-brand-900/60">
       📍 {palika}{wardNo ? ` W-${wardNo}` : ''}{district ? `, ${district}` : ''}
     </span>
   )
+}
+
+export function Divider() {
+  return <div className="border-t border-slate-800/60 my-4" />
 }

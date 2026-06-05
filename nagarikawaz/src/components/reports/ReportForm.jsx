@@ -7,8 +7,9 @@ import { useAuth } from '../../context/AuthContext'
 import { useLang } from '../../context/LangContext'
 import { useCreateReport, usePhotoUpload } from '../../hooks'
 import { reportsApi } from '../../services/api'
-import { CATEGORIES, SEVERITIES, PROVINCES, DISTRICTS_BY_PROVINCE, PALIKA_TYPES, DEPARTMENTS, MAP_DEFAULTS } from '../../utils/constants'
+import { CATEGORIES, SEVERITIES, MAP_DEFAULTS } from '../../utils/constants'
 import { Spinner } from '../ui'
+import NepalLocationPicker from '../ui/NepalLocationPicker'
 import { cn } from '../../utils/helpers'
 import toast from 'react-hot-toast'
 
@@ -38,8 +39,15 @@ export default function ReportForm() {
   const [addrEn,   setAddrEn]   = useState('')
   const [detect,   setDetect]   = useState(false)
   const [dups,     setDups]     = useState([])
-  const [province, setProvince] = useState(profile?.province || '')
-  const [district, setDistrict] = useState(profile?.district || '')
+  const [location, setLocation] = useState({
+    province: profile?.province || '',
+    district: profile?.district || '',
+    palika:   profile?.palika   || '',
+    palika_np: '',
+    palika_type: profile?.palika_type || '',
+    ward_no:  profile?.ward_no  || '',
+    lat: '', lon: '',
+  })
   const [previews, setPreviews] = useState([])
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm({
@@ -89,15 +97,19 @@ export default function ReportForm() {
   async function onSubmit(data) {
     if (!pos) { toast.error('Please pin the location'); setStep(2); return }
     if (!user) { navigate('/login'); return }
+    if (!location.palika) { toast.error(lang === 'ne' ? 'पालिका छान्नुहोस्' : 'Please select a Palika'); setStep(1); return }
     await create.mutateAsync({
       title_np: data.title_np, title_en: data.title_en || data.title_np,
       description_np: data.description_np, description_en: data.description_en || data.description_np,
       category: data.category, severity: data.severity,
       lat: pos.lat, lng: pos.lng,
       address_np: addrNp, address_en: addrEn,
-      province, district,
-      palika: data.palika, palika_type: data.palika_type,
-      ward_no: data.ward_no,
+      province:    location.province,
+      district:    location.district,
+      palika:      location.palika,
+      palika_np:   location.palika_np,
+      palika_type: location.palika_type,
+      ward_no:     location.ward_no,
       photo_ids: fileIds.join(','),
       submitted_by:    profile?.name_np || profile?.name_en || user.email,
       submitter_phone: profile?.phone || '',
@@ -118,7 +130,6 @@ export default function ReportForm() {
   )
 
   const steps = [{ n: 1, np: 'विवरण', en: 'Details' }, { n: 2, np: 'स्थान', en: 'Location' }, { n: 3, np: 'तस्वीर', en: 'Photos' }]
-  const provinceObj = PROVINCES.find((p) => p.name_en === province)
 
   return (
     <div className="min-h-screen pt-4 pb-10 px-3">
@@ -235,51 +246,15 @@ export default function ReportForm() {
                 </div>
               </div>
 
-              {/* Nepal admin hierarchy */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label">प्रदेश / Province</label>
-                  <select value={province} onChange={(e) => { setProvince(e.target.value); setDistrict('') }}
-                    className="input text-sm">
-                    <option value="">छान्नुहोस्…</option>
-                    {PROVINCES.map((p) => (
-                      <option key={p.id} value={p.name_en}>{lang === 'ne' ? p.name_np : p.name_en}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="label">जिल्ला / District</label>
-                  <select value={district} onChange={(e) => setDistrict(e.target.value)}
-                    className="input text-sm" disabled={!province}>
-                    <option value="">छान्नुहोस्…</option>
-                    {(DISTRICTS_BY_PROVINCE[provinceObj?.id] || []).map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label">पालिका / Palika *</label>
-                  <input {...register('palika', { required: 'पालिका आवश्यक छ' })}
-                    className="input text-sm" placeholder="जस्तै: पोखरा महानगरपालिका" />
-                  {errors.palika && <p className="text-red-400 text-xs mt-1">{errors.palika.message}</p>}
-                </div>
-                <div>
-                  <label className="label">वडा नं. *</label>
-                  <input {...register('ward_no', { required: true })} type="number" min="1" max="35"
-                    className="input text-sm" placeholder="१" />
-                </div>
-              </div>
-
+              {/* Nepal location cascade — from shapefile */}
               <div>
-                <label className="label">पालिका प्रकार</label>
-                <select {...register('palika_type')} className="input text-sm">
-                  {Object.entries(PALIKA_TYPES).map(([k, v]) => (
-                    <option key={k} value={k}>{lang === 'ne' ? v.np : v.en}</option>
-                  ))}
-                </select>
+                <label className="label">{lang === 'ne' ? 'ठेगाना (पालिका सम्म)' : 'Location (to Palika level)'}</label>
+                <NepalLocationPicker
+                  value={location}
+                  onChange={setLocation}
+                  required
+                  showWard
+                />
               </div>
 
               <button type="button" onClick={() => setStep(2)} className="btn-nepal w-full justify-center">
@@ -362,8 +337,9 @@ export default function ReportForm() {
                 {[
                   [lang === 'ne' ? 'श्रेणी' : 'Category', CATEGORIES[watch('category')]?.[lang === 'ne' ? 'np' : 'en']],
                   [lang === 'ne' ? 'गम्भीरता' : 'Severity', SEVERITIES[watch('severity')]?.[lang === 'ne' ? 'np' : 'en']],
-                  [lang === 'ne' ? 'पालिका' : 'Palika', watch('palika')],
-                  [lang === 'ne' ? 'वडा' : 'Ward', watch('ward_no')],
+                  [lang === 'ne' ? 'पालिका' : 'Palika', location.palika || '—'],
+                  [lang === 'ne' ? 'जिल्ला' : 'District', location.district || '—'],
+                  [lang === 'ne' ? 'वडा' : 'Ward', location.ward_no || '—'],
                   [lang === 'ne' ? 'तस्वीर' : 'Photos', `${fileIds.length} ${tr('uploaded')}`],
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between text-sm">

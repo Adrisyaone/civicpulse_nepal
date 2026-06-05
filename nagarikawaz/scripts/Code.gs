@@ -15,11 +15,29 @@ var SHEETS = {
   PROGRESS: 'ProgressUpdates',
   DEPTS:    'Departments',
   AI:       'AIReports',
+  UPVOTERS: 'Upvoters',
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 function doGet(e) {
-  var p = (e && e.parameter) ? e.parameter : {}
+  return _handle((e && e.parameter) ? e.parameter : {})
+}
+
+function doPost(e) {
+  var p = {}
+  // Merge query params
+  if (e && e.parameter) Object.keys(e.parameter).forEach(function(k){ p[k] = e.parameter[k] })
+  // Merge JSON body (used for photo uploads to avoid GET URL length limits)
+  if (e && e.postData && e.postData.type === 'application/json') {
+    try {
+      var body = JSON.parse(e.postData.contents)
+      Object.keys(body).forEach(function(k){ p[k] = body[k] })
+    } catch(err) { Logger.log('doPost body parse error: ' + err) }
+  }
+  return _handle(p)
+}
+
+function _handle(p) {
   var action = p.action || 'ping'
   var result
 
@@ -51,7 +69,7 @@ function doGet(e) {
       // Drive
       case 'uploadPhoto':        result = uploadPhoto(p);          break
       // Health
-      case 'ping':               result = { ok: true, ts: new Date().toISOString(), version: '2.0' }; break
+      case 'ping':               result = { ok: true, ts: new Date().toISOString(), version: '2.1' }; break
       default:                   result = { error: 'Unknown action: ' + action }
     }
   } catch (err) {
@@ -99,39 +117,54 @@ function getReport(id) {
 }
 
 function createReport(p) {
-  var sheet = getSheet(SHEETS.REPORTS)
-  var id    = uuid()
-  var now   = new Date().toISOString()
-  var score = calcPriority(p)
+function createReport(p) {
+  var sheet   = getSheet(SHEETS.REPORTS)
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+  var id      = uuid()
+  var now     = new Date().toISOString()
+  var score   = calcPriority(p)
 
-  sheet.appendRow([
-    id,
-    sanitize(p.title_np    || ''),
-    sanitize(p.title_en    || ''),
-    sanitize(p.description_np || ''),
-    sanitize(p.description_en || ''),
-    sanitize(p.category    || 'other'),
-    sanitize(p.severity    || 'medium'),
-    p.lat || '', p.lng || '',
-    sanitize(p.province    || ''),
-    sanitize(p.district    || ''),
-    sanitize(p.palika      || ''),
-    sanitize(p.palika_type || 'gaunpalika'),
-    p.ward_no || '',
-    sanitize(p.address_np  || ''),
-    sanitize(p.address_en  || ''),
-    'darta',         // status
-    score,           // priority_score
-    '',              // department
-    sanitize(p.submitted_by    || ''),
-    sanitize(p.submitter_phone || ''),
-    p.photo_ids || '',
-    0, 0,            // upvotes, comments_count
-    now, now, '',    // created_at, updated_at, resolved_at
-  ])
+  // Build row using header positions — immune to column order changes
+  var data = {
+    id:               id,
+    title_np:         sanitize(p.title_np         || ''),
+    title_en:         sanitize(p.title_en         || ''),
+    description_np:   sanitize(p.description_np   || ''),
+    description_en:   sanitize(p.description_en   || ''),
+    category:         sanitize(p.category         || 'other'),
+    severity:         sanitize(p.severity         || 'medium'),
+    lat:              p.lat                        || '',
+    lng:              p.lng                        || '',
+    province:         sanitize(p.province         || ''),
+    district:         sanitize(p.district         || ''),
+    palika:           sanitize(p.palika           || ''),
+    palika_type:      sanitize(p.palika_type      || 'gaunpalika'),
+    ward_no:          p.ward_no                    || '',
+    address_np:       sanitize(p.address_np       || ''),
+    address_en:       sanitize(p.address_en       || ''),
+    status:           'darta',
+    priority_score:   score,
+    department:       '',
+    submitted_by:     sanitize(p.submitted_by     || ''),
+    submitter_phone:  sanitize(p.submitter_phone  || ''),
+    photo_ids:        p.photo_ids                  || '',
+    upvotes:          0,
+    comments_count:   0,
+    created_at:       now,
+    updated_at:       now,
+    resolved_at:      '',
+  }
 
-  // Notify: send email if configured
-  notifyNewReport({ id: id, title_en: p.title_en || p.title_np, province: p.province, district: p.district, palika: p.palika, ward_no: p.ward_no })
+  var row = headers.map(function(h) {
+    return data.hasOwnProperty(h) ? data[h] : ''
+  })
+  sheet.appendRow(row)
+
+  notifyNewReport({
+    id: id, title_en: p.title_en || p.title_np,
+    province: p.province, district: p.district,
+    palika: p.palika, ward_no: p.ward_no,
+  })
 
   return { id: id, priority_score: score, status: 'darta', created_at: now }
 }
@@ -169,6 +202,21 @@ function updateReport(p) {
 }
 
 function upvoteReport(p) {
+  if (!p.id) throw new Error('id required')
+
+  // Check for duplicate vote using a simple Upvoters sheet
+  if (p.userId) {
+    var upvoterSheet = getSheet('Upvoters')
+    var upvoters = readSheet(upvoterSheet)
+    var already  = upvoters.find(function(r){
+      return r.report_id === String(p.id) && r.user_id === String(p.userId)
+    })
+    if (already) return { ok: false, reason: 'already_voted', upvotes: null }
+
+    // Record the vote
+    upvoterSheet.appendRow([uuid(), String(p.id), String(p.userId), new Date().toISOString()])
+  }
+
   return incrementField(SHEETS.REPORTS, p.id, 'upvotes')
 }
 
@@ -227,12 +275,19 @@ function getComments(reportId) {
 
 function addComment(p) {
   if (!p.reportId) throw new Error('reportId required')
-  var id  = uuid()
-  var now = new Date().toISOString()
-  getSheet(SHEETS.COMMENTS).appendRow([
-    id, p.reportId, p.userId||'', sanitize(p.user_name||''),
-    sanitize(p.comment_np||''), sanitize(p.comment_en||''), now,
-  ])
+  var sheet   = getSheet(SHEETS.COMMENTS)
+  var headers = sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0]
+  var id = uuid(); var now = new Date().toISOString()
+  var data = {
+    id:         id,
+    report_id:  p.reportId,
+    user_id:    p.userId    || '',
+    user_name:  sanitize(p.user_name  || ''),
+    comment_np: sanitize(p.comment_np || ''),
+    comment_en: sanitize(p.comment_en || ''),
+    created_at: now,
+  }
+  sheet.appendRow(headers.map(function(h){ return data.hasOwnProperty(h)?data[h]:'' }))
   incrementField(SHEETS.REPORTS, p.reportId, 'comments_count')
   return { id: id, created_at: now }
 }
@@ -249,13 +304,21 @@ function getProgress(reportId) {
 
 function addProgress(p) {
   if (!p.reportId) throw new Error('reportId required')
-  var id  = uuid()
-  var now = new Date().toISOString()
-  getSheet(SHEETS.PROGRESS).appendRow([
-    id, p.reportId, sanitize(p.officer||''), sanitize(p.status||''),
-    parseInt(p.progress_percent||0), sanitize(p.note_np||''), sanitize(p.note_en||''),
-    sanitize(p.department||''), now,
-  ])
+  var sheet   = getSheet(SHEETS.PROGRESS)
+  var headers = sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0]
+  var id = uuid(); var now = new Date().toISOString()
+  var data = {
+    id:               id,
+    report_id:        p.reportId,
+    officer:          sanitize(p.officer          || ''),
+    status:           sanitize(p.status           || ''),
+    progress_percent: parseInt(p.progress_percent || 0),
+    note_np:          sanitize(p.note_np          || ''),
+    note_en:          sanitize(p.note_en          || ''),
+    department:       sanitize(p.department       || ''),
+    timestamp:        now,
+  }
+  sheet.appendRow(headers.map(function(h){ return data.hasOwnProperty(h)?data[h]:'' }))
   if (p.status) updateReport({ id: p.reportId, status: p.status })
   return { id: id, timestamp: now }
 }
@@ -284,15 +347,25 @@ function upsertUser(p) {
     return existing
   }
   var id = uuid(); var now = new Date().toISOString()
-  sheet.appendRow([
-    id, p.supabase_user_id||'',
-    sanitize(p.name_np||''), sanitize(p.name_en||''),
-    sanitize(p.email||''), sanitize(p.phone||''),
-    p.role||'nagarik',
-    sanitize(p.province||''), sanitize(p.district||''),
-    sanitize(p.palika||''), p.ward_no||'', p.department||'',
-    now, 'active',
-  ])
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+  var data = {
+    id:               id,
+    supabase_user_id: p.supabase_user_id || '',
+    name_np:          sanitize(p.name_np     || ''),
+    name_en:          sanitize(p.name_en     || ''),
+    email:            sanitize(p.email       || ''),
+    phone:            sanitize(p.phone       || ''),
+    role:             p.role                  || 'nagarik',
+    province:         sanitize(p.province    || ''),
+    district:         sanitize(p.district    || ''),
+    palika:           sanitize(p.palika      || ''),
+    ward_no:          p.ward_no               || '',
+    department:       p.department            || '',
+    created_at:       now,
+    status:           'active',
+  }
+  var row = headers.map(function(h){ return data.hasOwnProperty(h) ? data[h] : '' })
+  sheet.appendRow(row)
   return { id: id, role: 'nagarik', created_at: now }
 }
 
@@ -388,19 +461,32 @@ function prioritizeReport(id) {
 }
 
 // =============================================================================
-// DRIVE — PHOTO UPLOAD
+// DRIVE — PHOTO UPLOAD (called via POST from frontend)
 // =============================================================================
 function uploadPhoto(p) {
-  if (!p.data || !p.fileName) throw new Error('data and fileName required')
+  if (!p.data)     throw new Error('No image data received')
+  if (!p.fileName) throw new Error('fileName required')
+
+  // Validate base64 length (10 MB compressed = ~13.3 MB base64)
+  if (p.data.length > 14 * 1024 * 1024) throw new Error('Image too large — max 10 MB')
+
   var folder = getOrCreateFolder('photos')
   var bytes  = Utilities.base64Decode(p.data)
-  var blob   = Utilities.newBlob(bytes, p.mimeType||'image/jpeg', p.fileName)
-  var file   = folder.createFile(blob)
+  var mime   = p.mimeType || 'image/jpeg'
+
+  // Sanitise filename
+  var safeName = String(p.fileName).replace(/[^a-zA-Z0-9._-]/g,'_').slice(0, 100)
+  var blob     = Utilities.newBlob(bytes, mime, safeName)
+  var file     = folder.createFile(blob)
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW)
+
+  Logger.log('Photo uploaded: ' + file.getId() + ' (' + Math.round(bytes.length/1024) + ' KB)')
+
   return {
     fileId:   file.getId(),
     fileUrl:  file.getUrl(),
     thumbUrl: 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w400',
+    size:     bytes.length,
   }
 }
 
@@ -525,6 +611,7 @@ var HEADERS = {
   ProgressUpdates:['id','report_id','officer','status','progress_percent','note_np','note_en','department','timestamp'],
   Departments:    ['id','dept_name_np','dept_name_en','palika','district','lead_email','lead_phone'],
   AIReports:      ['id','title','province','district','palika','report_count','summary_json','doc_url','created_at'],
+  Upvoters:       ['id','report_id','user_id','created_at'],
 }
 
 function initHeaders(sheet, name) {
