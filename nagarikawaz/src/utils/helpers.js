@@ -42,9 +42,11 @@ export function statusToProgress(status) {
 }
 
 export function driveThumb(id, size = 300) {
+  if (!id) return ''
   return `https://drive.google.com/thumbnail?id=${id}&sz=w${size}`
 }
 export function driveView(id) {
+  if (!id) return ''
   return `https://drive.google.com/file/d/${id}/view`
 }
 

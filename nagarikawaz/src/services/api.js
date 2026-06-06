@@ -57,35 +57,31 @@ export const aiApi = {
   list:     ()     => q('listAIReports'),
 }
 
-// ── Photo upload (base64 via POST to avoid URL length limits) ─────────────────
+// ── Photo upload via Netlify proxy → Google Drive ────────────────────────────
+// Direct GAS POST fails in browsers (302 redirect strips body + CORS).
+// The Netlify function at /.netlify/functions/upload-photo proxies server-side.
 export function uploadPhoto(file, reportId = 'temp') {
-  if (!BASE) return Promise.reject(new Error('VITE_SHEETS_API_URL is not set — check Netlify env vars'))
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = async (e) => {
       try {
         const b64 = e.target.result.split(',')[1]
         if (!b64) throw new Error('Could not read file data')
-        const body = JSON.stringify({
-          action:   'uploadPhoto',
-          reportId,
-          fileName: file.name,
-          mimeType: file.type || 'image/jpeg',
-          data:     b64,
-        })
-        const res = await fetch(BASE, {
+        const res = await fetch('/.netlify/functions/upload-photo', {
           method:  'POST',
-          body,
-          headers: { 'Content-Type': 'text/plain' },
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action:   'uploadPhoto',
+            reportId,
+            fileName: file.name,
+            mimeType: file.type || 'image/jpeg',
+            data:     b64,
+          }),
         })
         let result
-        try {
-          result = await res.json()
-        } catch {
-          throw new Error(`Server returned non-JSON (status ${res.status}) — check Apps Script deployment`)
-        }
-        if (result.error) throw new Error(`Drive error: ${result.error}`)
-        if (!result.fileId) throw new Error('No fileId returned — check Drive permissions in Apps Script')
+        try { result = await res.json() } catch { throw new Error(`Unexpected server response (${res.status})`) }
+        if (result.error) throw new Error(result.error)
+        if (!result.fileId) throw new Error('No fileId returned from Drive')
         resolve(result)
       } catch (err) { reject(err) }
     }
