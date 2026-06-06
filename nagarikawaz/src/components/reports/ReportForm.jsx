@@ -113,12 +113,12 @@ export default function ReportForm() {
       try {
         const compressed = await compressImage(file)
         const result = await uploadPhoto(compressed, 'temp')
-        if (!result?.fileId) throw new Error('no fileId returned')
         setPhotos((p) => p.map((ph, j) => j === baseIdx + i ? { ...ph, fileId: result.fileId, uploading: false } : ph))
       } catch (err) {
-        console.error('Photo upload error:', err)
-        toast.error(lang === 'ne' ? 'तस्वीर अपलोड असफल' : 'Photo upload failed')
-        setPhotos((p) => p.map((ph, j) => j === baseIdx + i ? { ...ph, uploading: false, error: true } : ph))
+        const msg = err?.message || 'Upload failed'
+        console.error('Photo upload error:', msg)
+        toast.error(msg, { duration: 6000 })
+        setPhotos((p) => p.map((ph, j) => j === baseIdx + i ? { ...ph, uploading: false, error: true, errorMsg: msg, origFile: file } : ph))
       }
     })
   }
@@ -385,8 +385,23 @@ export default function ReportForm() {
                           <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Spinner size="sm" /></div>
                         )}
                         {p.error && (
-                          <div className="absolute inset-0 bg-red-900/60 flex items-center justify-center">
-                            <span className="text-red-300 text-xs font-medium">✗</span>
+                          <div className="absolute inset-0 bg-red-900/75 flex flex-col items-center justify-center gap-1 p-1">
+                            <span className="text-red-200 text-xs font-bold">✗ Failed</span>
+                            <button type="button"
+                              className="text-xs bg-white/20 hover:bg-white/30 text-white px-2 py-0.5 rounded-full"
+                              onClick={() => {
+                                if (!p.origFile) return
+                                setPhotos((prev) => prev.map((ph, j) => j === i ? { ...ph, uploading: true, error: false, errorMsg: null } : ph))
+                                compressImage(p.origFile).then((c) => uploadPhoto(c, 'temp')).then((result) => {
+                                  setPhotos((prev) => prev.map((ph, j) => j === i ? { ...ph, fileId: result.fileId, uploading: false } : ph))
+                                }).catch((err) => {
+                                  const msg = err?.message || 'Upload failed'
+                                  toast.error(msg, { duration: 6000 })
+                                  setPhotos((prev) => prev.map((ph, j) => j === i ? { ...ph, uploading: false, error: true, errorMsg: msg } : ph))
+                                })
+                              }}>
+                              ↺ Retry
+                            </button>
                           </div>
                         )}
                         {p.fileId && !p.uploading && (

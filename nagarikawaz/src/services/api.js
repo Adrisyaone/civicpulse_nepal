@@ -59,28 +59,37 @@ export const aiApi = {
 
 // ── Photo upload (base64 via POST to avoid URL length limits) ─────────────────
 export function uploadPhoto(file, reportId = 'temp') {
+  if (!BASE) return Promise.reject(new Error('VITE_SHEETS_API_URL is not set — check Netlify env vars'))
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = async (e) => {
       try {
+        const b64 = e.target.result.split(',')[1]
+        if (!b64) throw new Error('Could not read file data')
         const body = JSON.stringify({
           action:   'uploadPhoto',
           reportId,
           fileName: file.name,
-          mimeType: file.type,
-          data:     e.target.result.split(',')[1],
+          mimeType: file.type || 'image/jpeg',
+          data:     b64,
         })
         const res = await fetch(BASE, {
           method:  'POST',
           body,
           headers: { 'Content-Type': 'text/plain' },
         })
-        const result = await res.json()
-        if (result.error) throw new Error(result.error)
+        let result
+        try {
+          result = await res.json()
+        } catch {
+          throw new Error(`Server returned non-JSON (status ${res.status}) — check Apps Script deployment`)
+        }
+        if (result.error) throw new Error(`Drive error: ${result.error}`)
+        if (!result.fileId) throw new Error('No fileId returned — check Drive permissions in Apps Script')
         resolve(result)
       } catch (err) { reject(err) }
     }
-    reader.onerror = reject
+    reader.onerror = () => reject(new Error('Could not read file'))
     reader.readAsDataURL(file)
   })
 }
