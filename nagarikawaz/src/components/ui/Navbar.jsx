@@ -40,8 +40,8 @@ export default function Navbar() {
             न
           </div>
           <div className="hidden sm:block leading-tight">
-            <div className="font-display font-bold text-white text-[15px]">नागरिक आवाज</div>
-            <div className="text-brand-500 text-[10px] -mt-0.5">NagarikAwaz</div>
+            <div className="font-display font-bold text-white text-[15px]">{lang === 'ne' ? 'नागरिक आवाज' : 'NagarikAwaz'}</div>
+            <div className="text-brand-500 text-[10px] -mt-0.5">{lang === 'ne' ? 'NagarikAwaz' : 'Citizen Voice'}</div>
           </div>
         </Link>
 
@@ -91,7 +91,7 @@ export default function Navbar() {
                       <p className="text-xs text-slate-500 truncate">{user.email}</p>
                       {profile?.palika && (
                         <p className="text-xs text-brand-500 mt-0.5">
-                          {profile.palika}{profile.ward_no ? ` · वडा ${profile.ward_no}` : ''}
+                          {profile.palika}{profile.ward_no ? ` · ${lang === 'ne' ? 'वडा' : 'Ward'} ${profile.ward_no}` : ''}
                         </p>
                       )}
                       <div className="mt-1.5"><RoleBadge role={profile?.role} /></div>
@@ -121,15 +121,15 @@ export default function Navbar() {
       </div>
 
       {/* Mobile bottom nav */}
-      <div className="md:hidden flex border-t border-slate-800/60 overflow-x-auto">
+      <div className="md:hidden flex border-t border-slate-800/60">
         {links.map((l) => (
           <Link key={l.to} to={l.to}
             className={cn(
-              'flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs flex-shrink-0 transition-all',
-              active(l.to) ? 'text-brand-400 bg-brand-900/30' : 'text-slate-500 hover:text-slate-300'
+              'flex flex-col items-center justify-center gap-0.5 flex-1 py-2.5 text-xs font-medium transition-all min-h-[44px]',
+              active(l.to) ? 'text-brand-400 bg-brand-900/30' : 'text-slate-500'
             )}>
-            <span className="text-base">{l.icon}</span>
-            {tr(l.k)}
+            <span className="text-lg leading-none">{l.icon}</span>
+            <span className="leading-none mt-0.5">{tr(l.k)}</span>
           </Link>
         ))}
       </div>

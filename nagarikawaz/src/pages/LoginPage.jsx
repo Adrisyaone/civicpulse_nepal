@@ -44,8 +44,8 @@ export default function LoginPage() {
         <div className="text-center mb-7">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl font-bold text-white font-display"
             style={{ background: 'linear-gradient(135deg, #DC143C 50%, #003893 50%)' }}>न</div>
-          <h1 className="font-display font-bold text-2xl text-white">नागरिक आवाज</h1>
-          <p className="text-slate-500 text-sm mt-1">{lang === 'ne' ? 'आफ्नो खातामा लगइन गर्नुहोस्' : 'Sign in to your account'}</p>
+          <h1 className="font-display font-bold text-2xl text-white">{tr('appName')}</h1>
+          <p className="text-slate-500 text-sm mt-1">{tr('signInSubtitle')}</p>
         </div>
         <div className="card p-6 space-y-4">
           <button onClick={handleGoogle} disabled={busy} className="btn-ghost w-full justify-center py-2.5">

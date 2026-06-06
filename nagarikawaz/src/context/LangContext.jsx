@@ -130,6 +130,23 @@ const UI = {
   notFound:      { ne: 'पृष्ठ फेला परेन',          en: 'Page not found'        },
   score:         { ne: 'स्कोर',                     en: 'score'                 },
   docLink:       { ne: 'Doc',                       en: 'Doc'                   },
+  selectOpt:     { ne: 'छान्नुहोस्…',              en: 'Select…'               },
+  titleNpLabel:  { ne: 'शीर्षक (नेपाली)',           en: 'Title (Nepali)'        },
+  descNpLabel:   { ne: 'विवरण (नेपाली)',            en: 'Description (Nepali)'  },
+  palikTypeLabel:{ ne: 'पालिका प्रकार',             en: 'Palika Type'           },
+  noteNpLabel:   { ne: 'नोट (नेपाली)',              en: 'Note (Nepali)'         },
+  signInComment: { ne: 'लगइन गरेर टिप्पणी गर्नुहोस्', en: 'Sign in to comment' },
+  addCommentPH:  { ne: 'टिप्पणी थप्नुहोस्…',       en: 'Add a comment…'        },
+  progressDescPH:{ ne: 'कार्य प्रगतिको विवरण…',    en: 'Progress description…' },
+  wardLabel:     { ne: 'वडा',                       en: 'Ward'                  },
+  titleNpPH:     { ne: 'जस्तै: मुख्य सडकमा ठूलो खाल्डो', en: 'e.g. Large pothole on main road' },
+  descNpPH:      { ne: 'समस्याको विस्तृत विवरण लेख्नुहोस्…', en: 'Describe the issue in detail…' },
+  palikaPHLabel: { ne: 'जस्तै: पोखरा महानगरपालिका', en: 'e.g. Pokhara Metropolitan' },
+  wardNoPH:      { ne: '१',                         en: '1'                     },
+  somethingWrong:{ ne: 'केही गडबड भयो',            en: 'Something went wrong'  },
+  reload:        { ne: 'पुनः लोड',                  en: 'Reload'                },
+  signInSubtitle:{ ne: 'आफ्नो खातामा लगइन गर्नुहोस्', en: 'Sign in to your account' },
+  citizenVoice:  { ne: 'नागरिक आवाज',              en: 'Citizen Voice'         },
 }
 
 export function LangProvider({ children }) {

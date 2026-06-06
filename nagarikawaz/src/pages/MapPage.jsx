@@ -13,9 +13,9 @@ export default function MapPage() {
   function toggle(k, v) { setFilters((f) => ({ ...f, [k]: f[k] === v ? '' : v })) }
 
   return (
-    <div className="fixed inset-0" style={{ top: 'calc(53px + 40px)' }}>
-      <style>{`@media(min-width:768px){.map-root{top:53px}}`}</style>
-      <div className="map-root fixed inset-0" style={{ top: 'calc(53px + 40px)' }}>
+    <div className="fixed inset-0" style={{ top: 'calc(53px + 48px)' }}>
+      <style>{`@media(min-width:768px){.map-root{top:56px}}`}</style>
+      <div className="map-root fixed inset-0" style={{ top: 'calc(53px + 48px)' }}>
         {/* Filter toggle */}
         <div className="absolute top-3 left-3 z-30 flex gap-2">
           <button onClick={() => setShowF(!showF)}

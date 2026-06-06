@@ -57,18 +57,26 @@ export const aiApi = {
   list:     ()     => q('listAIReports'),
 }
 
-// ── Photo upload (base64) ─────────────────────────────────────────────────────
+// ── Photo upload (base64 via POST to avoid URL length limits) ─────────────────
 export function uploadPhoto(file, reportId = 'temp') {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = async (e) => {
       try {
-        const result = await q('uploadPhoto', {
+        const body = JSON.stringify({
+          action:   'uploadPhoto',
           reportId,
           fileName: file.name,
           mimeType: file.type,
           data:     e.target.result.split(',')[1],
         })
+        const res = await fetch(BASE, {
+          method:  'POST',
+          body,
+          headers: { 'Content-Type': 'text/plain' },
+        })
+        const result = await res.json()
+        if (result.error) throw new Error(result.error)
         resolve(result)
       } catch (err) { reject(err) }
     }

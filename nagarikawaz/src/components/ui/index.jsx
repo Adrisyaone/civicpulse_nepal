@@ -9,6 +9,7 @@ export function Spinner({ size = 'md', className = '' }) {
 }
 
 export function LoadingScreen() {
+  const { tr } = useLang()
   return (
     <div className="fixed inset-0 bg-[#060e08] flex flex-col items-center justify-center gap-4 z-[9999]">
       <div className="relative w-16 h-16">
@@ -16,8 +17,8 @@ export function LoadingScreen() {
         <div className="absolute inset-0 flex items-center justify-center text-nepal-red text-xl font-bold">न</div>
       </div>
       <div className="text-center">
-        <p className="font-display font-bold text-brand-400 text-lg">नागरिक आवाज</p>
-        <p className="text-slate-600 text-xs mt-1">लोड हुँदैछ…</p>
+        <p className="font-display font-bold text-brand-400 text-lg">{tr('appName')}</p>
+        <p className="text-slate-600 text-xs mt-1">{tr('loading')}</p>
       </div>
     </div>
   )
@@ -85,13 +86,18 @@ export class ErrorBoundary extends React.Component {
   static getDerivedStateFromError(e) { return { err: e } }
   componentDidCatch(e, info) { console.error('[ErrorBoundary]', e, info) }
   render() {
+    const isNe = (() => { try { return (localStorage.getItem('na_lang') || 'ne') === 'ne' } catch { return true } })()
     if (this.state.err) return (
       <div className="min-h-screen flex items-center justify-center p-8 bg-[#060e08]">
         <div className="card p-8 max-w-md text-center">
           <div className="text-5xl mb-4">⚠️</div>
-          <h2 className="font-display text-xl font-bold text-red-400 mb-2">केही गडबड भयो</h2>
+          <h2 className="font-display text-xl font-bold text-red-400 mb-2">
+            {isNe ? 'केही गडबड भयो' : 'Something went wrong'}
+          </h2>
           <p className="text-slate-500 text-sm mb-6">{this.state.err.message}</p>
-          <button className="btn-primary" onClick={() => window.location.reload()}>पुनः लोड / Reload</button>
+          <button className="btn-primary" onClick={() => window.location.reload()}>
+            {isNe ? 'पुनः लोड' : 'Reload'}
+          </button>
         </div>
       </div>
     )

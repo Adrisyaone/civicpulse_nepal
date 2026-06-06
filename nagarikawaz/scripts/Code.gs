@@ -18,6 +18,19 @@ var SHEETS = {
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
+function doPost(e) {
+  var p = {}
+  try { p = JSON.parse(e.postData.contents) } catch(err) { return json({ error: 'Invalid JSON body' }) }
+  var action = p.action || ''
+  try {
+    if (action === 'uploadPhoto') return json(uploadPhoto(p))
+    return json({ error: 'Unknown POST action: ' + action })
+  } catch(err) {
+    Logger.log('ERROR [POST/' + action + ']: ' + err)
+    return json({ error: String(err.message || err) })
+  }
+}
+
 function doGet(e) {
   var p = (e && e.parameter) ? e.parameter : {}
   var action = p.action || 'ping'
@@ -99,36 +112,44 @@ function getReport(id) {
 }
 
 function createReport(p) {
-  var sheet = getSheet(SHEETS.REPORTS)
-  var id    = uuid()
-  var now   = new Date().toISOString()
-  var score = calcPriority(p)
+  var sheet   = getSheet(SHEETS.REPORTS)
+  var headers = sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0]
+  var id      = uuid()
+  var now     = new Date().toISOString()
+  var score   = calcPriority(p)
 
-  sheet.appendRow([
-    id,
-    sanitize(p.title_np    || ''),
-    sanitize(p.title_en    || ''),
-    sanitize(p.description_np || ''),
-    sanitize(p.description_en || ''),
-    sanitize(p.category    || 'other'),
-    sanitize(p.severity    || 'medium'),
-    p.lat || '', p.lng || '',
-    sanitize(p.province    || ''),
-    sanitize(p.district    || ''),
-    sanitize(p.palika      || ''),
-    sanitize(p.palika_type || 'gaunpalika'),
-    p.ward_no || '',
-    sanitize(p.address_np  || ''),
-    sanitize(p.address_en  || ''),
-    'darta',         // status
-    score,           // priority_score
-    '',              // department
-    sanitize(p.submitted_by    || ''),
-    sanitize(p.submitter_phone || ''),
-    p.photo_ids || '',
-    0, 0,            // upvotes, comments_count
-    now, now, '',    // created_at, updated_at, resolved_at
-  ])
+  var data = {
+    id:               id,
+    title_np:         sanitize(p.title_np         || ''),
+    title_en:         sanitize(p.title_en         || ''),
+    description_np:   sanitize(p.description_np   || ''),
+    description_en:   sanitize(p.description_en   || ''),
+    category:         sanitize(p.category         || 'other'),
+    severity:         sanitize(p.severity         || 'medium'),
+    lat:              p.lat      || '',
+    lng:              p.lng      || '',
+    province:         sanitize(p.province         || ''),
+    district:         sanitize(p.district         || ''),
+    palika:           sanitize(p.palika           || ''),
+    palika_type:      sanitize(p.palika_type      || 'gaunpalika'),
+    ward_no:          p.ward_no  || '',
+    address_np:       sanitize(p.address_np       || ''),
+    address_en:       sanitize(p.address_en       || ''),
+    status:           'darta',
+    priority_score:   score,
+    department:       '',
+    submitted_by:     sanitize(p.submitted_by     || ''),
+    submitter_phone:  sanitize(p.submitter_phone  || ''),
+    photo_ids:        p.photo_ids || '',
+    upvotes:          0,
+    comments_count:   0,
+    created_at:       now,
+    updated_at:       now,
+    resolved_at:      '',
+  }
+
+  var row = headers.map(function(h) { return data[h] !== undefined ? data[h] : '' })
+  sheet.appendRow(row)
 
   // Notify: send email if configured
   notifyNewReport({ id: id, title_en: p.title_en || p.title_np, province: p.province, district: p.district, palika: p.palika, ward_no: p.ward_no })
@@ -284,15 +305,24 @@ function upsertUser(p) {
     return existing
   }
   var id = uuid(); var now = new Date().toISOString()
-  sheet.appendRow([
-    id, p.supabase_user_id||'',
-    sanitize(p.name_np||''), sanitize(p.name_en||''),
-    sanitize(p.email||''), sanitize(p.phone||''),
-    p.role||'nagarik',
-    sanitize(p.province||''), sanitize(p.district||''),
-    sanitize(p.palika||''), p.ward_no||'', p.department||'',
-    now, 'active',
-  ])
+  var uHeaders = sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0]
+  var uData = {
+    id:               id,
+    supabase_user_id: p.supabase_user_id || '',
+    name_np:          sanitize(p.name_np     || ''),
+    name_en:          sanitize(p.name_en     || ''),
+    email:            sanitize(p.email       || ''),
+    phone:            sanitize(p.phone       || ''),
+    role:             p.role || 'nagarik',
+    province:         sanitize(p.province    || ''),
+    district:         sanitize(p.district    || ''),
+    palika:           sanitize(p.palika      || ''),
+    ward_no:          p.ward_no     || '',
+    department:       p.department  || '',
+    created_at:       now,
+    status:           'active',
+  }
+  sheet.appendRow(uHeaders.map(function(h){ return uData[h] !== undefined ? uData[h] : '' }))
   return { id: id, role: 'nagarik', created_at: now }
 }
 

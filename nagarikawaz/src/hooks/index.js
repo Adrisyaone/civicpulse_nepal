@@ -56,8 +56,11 @@ export function useUpvoteReport() {
   const { user } = useAuth()
   return useMutation({
     mutationFn: (id) => reportsApi.upvote(id, user?.id),
-    onSuccess:  () => qc.invalidateQueries({ queryKey: ['reports'] }),
-    onError:    () => toast.error('Upvote failed'),
+    onSuccess:  (_, id) => {
+      qc.invalidateQueries({ queryKey: ['reports'] })
+      qc.invalidateQueries({ queryKey: ['report', id] })
+    },
+    onError: () => toast.error('Upvote failed'),
   })
 }
 

@@ -1,0 +1,1 @@
+import{u as t,r as s,aa as r,j as n,ab as u}from"./index-jkFXjc6X.js";function c(){const a=t();return s.useEffect(()=>{r.auth.getSession().then(({data:{session:e}})=>{a(e?"/":"/login",{replace:!0})}).catch(()=>a("/login",{replace:!0}))},[a]),n.jsx(u,{})}export{c as default};

@@ -46,9 +46,9 @@ export default function ProgressTimeline({ reportId }) {
               <label className="label">{tr('status')}</label>
               <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
                 className="input text-sm" required>
-                <option value="">छान्नुहोस्…</option>
+                <option value="">{tr('selectOpt')}</option>
                 {Object.entries(STATUSES).map(([k, v]) => (
-                  <option key={k} value={k}>{v.np} / {v.en}</option>
+                  <option key={k} value={k}>{lang === 'ne' ? v.np : v.en}</option>
                 ))}
               </select>
             </div>
@@ -64,20 +64,20 @@ export default function ProgressTimeline({ reportId }) {
             <label className="label">{tr('department')}</label>
             <select value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
               className="input text-sm">
-              <option value="">छान्नुहोस्…</option>
-              {DEPARTMENTS.map((d) => <option key={d.en} value={d.en}>{d.np} / {d.en}</option>)}
+              <option value="">{tr('selectOpt')}</option>
+              {DEPARTMENTS.map((d) => <option key={d.en} value={d.en}>{lang === 'ne' ? d.np : d.en}</option>)}
             </select>
           </div>
           <div>
-            <label className="label">नोट (नेपाली)</label>
+            <label className="label">{tr('noteNpLabel')}</label>
             <textarea value={form.note_np} onChange={(e) => setForm((f) => ({ ...f, note_np: e.target.value }))}
               className="input text-sm resize-none" rows={2}
-              placeholder="कार्य प्रगतिको विवरण…" required />
+              placeholder={tr('progressDescPH')} required />
           </div>
           <div>
-            <label className="label">Note (English)</label>
+            <label className="label">{lang === 'ne' ? 'Note (English)' : 'Note (English)'}</label>
             <textarea value={form.note_en} onChange={(e) => setForm((f) => ({ ...f, note_en: e.target.value }))}
-              className="input text-sm resize-none" rows={2} placeholder="Progress description…" />
+              className="input text-sm resize-none" rows={2} placeholder="Progress description (English)…" />
           </div>
           <div className="flex gap-2 justify-end">
             <button type="button" className="btn-ghost py-1.5 text-sm" onClick={() => setOpen(false)}>{tr('cancel')}</button>

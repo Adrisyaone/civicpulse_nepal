@@ -46,11 +46,11 @@ export default function CommentSection({ reportId }) {
           {avatar(profile?.name_np || profile?.name_en || '?')}
           <div className="flex-1 space-y-2">
             <textarea value={np} onChange={(e) => setNp(e.target.value)} rows={2}
-              placeholder={user ? 'टिप्पणी थप्नुहोस्…' : 'लगइन गरेर टिप्पणी गर्नुहोस्'}
+              placeholder={user ? tr('addCommentPH') : tr('signInComment')}
               disabled={!user || addComment.isPending}
               className="input text-sm resize-none" maxLength={500} />
             <textarea value={en} onChange={(e) => setEn(e.target.value)} rows={1}
-              placeholder="Add comment in English (optional)…"
+              placeholder={lang === 'ne' ? 'Add comment in English (optional)…' : 'Comment (optional)…'}
               disabled={!user || addComment.isPending}
               className="input text-sm resize-none" maxLength={500} />
           </div>

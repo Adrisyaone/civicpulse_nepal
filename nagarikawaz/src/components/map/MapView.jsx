@@ -134,7 +134,7 @@ export default function MapView({ filters = {} }) {
             </h3>
             {(selected.palika || selected.district) && (
               <p className="text-xs text-brand-500 mb-2">
-                📍 {selected.palika || ''}{selected.ward_no ? ` वडा ${selected.ward_no}` : ''}{selected.district ? `, ${selected.district}` : ''}
+                📍 {selected.palika || ''}{selected.ward_no ? ` ${lang === 'ne' ? 'वडा' : 'Ward'} ${selected.ward_no}` : ''}{selected.district ? `, ${selected.district}` : ''}
               </p>
             )}
             <div className="flex items-center justify-between">

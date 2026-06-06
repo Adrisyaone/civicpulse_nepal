@@ -29,7 +29,7 @@ export default function SettingsPage() {
           <div>
             <p className="font-medium text-white">{profile?.name_np || profile?.name_en || '—'}</p>
             <p className="text-sm text-slate-500">{user?.email}</p>
-            {profile?.palika && <p className="text-xs text-brand-500 mt-0.5">{profile.palika}{profile.ward_no ? ` · वडा ${profile.ward_no}` : ''}</p>}
+            {profile?.palika && <p className="text-xs text-brand-500 mt-0.5">{profile.palika}{profile.ward_no ? ` · ${lang === 'ne' ? 'वडा' : 'Ward'} ${profile.ward_no}` : ''}</p>}
             <div className="mt-1.5"><RoleBadge role={profile?.role} /></div>
           </div>
         </div>

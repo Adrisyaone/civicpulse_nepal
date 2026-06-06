@@ -91,7 +91,7 @@ export default function AdminPage() {
                     <td className="px-4 py-3"><RoleBadge role={u.role} /></td>
                     <td className="px-4 py-3 text-xs text-slate-400">
                       {u.palika && <div className="font-medium">{u.palika}</div>}
-                      {u.ward_no && <div>वडा {u.ward_no}</div>}
+                      {u.ward_no && <div>{lang === 'ne' ? 'वडा' : 'Ward'} {u.ward_no}</div>}
                       {u.district && <div className="text-slate-600">{u.district}</div>}
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-600">

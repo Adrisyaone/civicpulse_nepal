@@ -36,8 +36,8 @@ function AppRoutes() {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-1" style={{ paddingTop: 'calc(53px + 40px)' }} id="main-content">
-        <style>{`@media(min-width:768px){#main-content{padding-top:53px}}`}</style>
+      <main className="flex-1" style={{ paddingTop: 'calc(53px + 48px)' }} id="main-content">
+        <style>{`@media(min-width:768px){#main-content{padding-top:56px}}`}</style>
         <Suspense fallback={<LoadingScreen />}>
           <Routes>
             <Route path="/"              element={<MapPage />} />

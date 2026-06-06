@@ -178,9 +178,9 @@ export default function ReportForm() {
 
               {/* Title NP */}
               <div>
-                <label className="label">शीर्षक (नेपाली) *</label>
-                <input {...register('title_np', { required: 'शीर्षक आवश्यक छ' })}
-                  className="input" placeholder="जस्तै: मुख्य सडकमा ठूलो खाल्डो" />
+                <label className="label">{tr('titleNpLabel')} *</label>
+                <input {...register('title_np', { required: lang === 'ne' ? 'शीर्षक आवश्यक छ' : 'Title is required' })}
+                  className="input" placeholder={tr('titleNpPH')} />
                 {errors.title_np && <p className="text-red-400 text-xs mt-1">{errors.title_np.message}</p>}
               </div>
 
@@ -205,9 +205,12 @@ export default function ReportForm() {
 
               {/* Desc NP */}
               <div>
-                <label className="label">विवरण (नेपाली) *</label>
-                <textarea {...register('description_np', { required: 'विवरण आवश्यक छ', minLength: { value: 10, message: 'कम्तीमा १० अक्षर' } })}
-                  className="input resize-none" rows={3} placeholder="समस्याको विस्तृत विवरण लेख्नुहोस्…" />
+                <label className="label">{tr('descNpLabel')} *</label>
+                <textarea {...register('description_np', {
+                  required: lang === 'ne' ? 'विवरण आवश्यक छ' : 'Description is required',
+                  minLength: { value: 10, message: lang === 'ne' ? 'कम्तीमा १० अक्षर' : 'Min 10 characters' }
+                })}
+                  className="input resize-none" rows={3} placeholder={tr('descNpPH')} />
                 {errors.description_np && <p className="text-red-400 text-xs mt-1">{errors.description_np.message}</p>}
               </div>
 
@@ -238,20 +241,20 @@ export default function ReportForm() {
               {/* Nepal admin hierarchy */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="label">प्रदेश / Province</label>
+                  <label className="label">{tr('province')}</label>
                   <select value={province} onChange={(e) => { setProvince(e.target.value); setDistrict('') }}
                     className="input text-sm">
-                    <option value="">छान्नुहोस्…</option>
+                    <option value="">{tr('selectOpt')}</option>
                     {PROVINCES.map((p) => (
                       <option key={p.id} value={p.name_en}>{lang === 'ne' ? p.name_np : p.name_en}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="label">जिल्ला / District</label>
+                  <label className="label">{tr('district')}</label>
                   <select value={district} onChange={(e) => setDistrict(e.target.value)}
                     className="input text-sm" disabled={!province}>
-                    <option value="">छान्नुहोस्…</option>
+                    <option value="">{tr('selectOpt')}</option>
                     {(DISTRICTS_BY_PROVINCE[provinceObj?.id] || []).map((d) => (
                       <option key={d} value={d}>{d}</option>
                     ))}
@@ -261,20 +264,20 @@ export default function ReportForm() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="label">पालिका / Palika *</label>
-                  <input {...register('palika', { required: 'पालिका आवश्यक छ' })}
-                    className="input text-sm" placeholder="जस्तै: पोखरा महानगरपालिका" />
+                  <label className="label">{tr('palika')} *</label>
+                  <input {...register('palika', { required: lang === 'ne' ? 'पालिका आवश्यक छ' : 'Palika is required' })}
+                    className="input text-sm" placeholder={tr('palikaPHLabel')} />
                   {errors.palika && <p className="text-red-400 text-xs mt-1">{errors.palika.message}</p>}
                 </div>
                 <div>
-                  <label className="label">वडा नं. *</label>
+                  <label className="label">{tr('ward')} *</label>
                   <input {...register('ward_no', { required: true })} type="number" min="1" max="35"
-                    className="input text-sm" placeholder="१" />
+                    className="input text-sm" placeholder={tr('wardNoPH')} />
                 </div>
               </div>
 
               <div>
-                <label className="label">पालिका प्रकार</label>
+                <label className="label">{tr('palikTypeLabel')}</label>
                 <select {...register('palika_type')} className="input text-sm">
                   {Object.entries(PALIKA_TYPES).map(([k, v]) => (
                     <option key={k} value={k}>{lang === 'ne' ? v.np : v.en}</option>
