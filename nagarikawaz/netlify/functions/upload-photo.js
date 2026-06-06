@@ -1,7 +1,3 @@
-// Proxy for Google Apps Script photo upload.
-// Browser can't POST directly to GAS — the 302 redirect strips the body and CORS blocks it.
-// This function runs server-side: no CORS, redirect followed manually with body preserved.
-
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' }
@@ -9,46 +5,43 @@ exports.handler = async (event) => {
 
   const GAS_URL = process.env.VITE_SHEETS_API_URL
   if (!GAS_URL) {
-    return {
-      statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'VITE_SHEETS_API_URL is not set in Netlify environment variables' }),
-    }
+    return resp({ error: 'VITE_SHEETS_API_URL not set in Netlify environment variables' })
+  }
+
+  // Netlify may base64-encode large bodies — decode first
+  const rawBody = event.isBase64Encoded
+    ? Buffer.from(event.body, 'base64').toString('utf8')
+    : (event.body || '')
+
+  if (!rawBody) {
+    return resp({ error: 'Empty request body received by proxy' })
   }
 
   try {
-    // Step 1: POST to GAS with redirect:manual so we can re-POST to the redirect URL.
-    // fetch (and browsers) normally convert POST→GET on 302 — server-side we can avoid this.
-    let res = await fetch(GAS_URL, {
-      method:   'POST',
-      body:     event.body,
-      headers:  { 'Content-Type': 'text/plain' },
-      redirect: 'manual',
+    // Use redirect:follow — Node.js fetch follows redirects like a browser but without
+    // CORS restrictions, so GAS responses are readable even after redirect
+    const gasRes = await fetch(GAS_URL, {
+      method:  'POST',
+      body:    rawBody,
+      headers: { 'Content-Type': 'text/plain' },
     })
 
-    // Step 2: If GAS redirected (302), follow it manually keeping POST + body
-    if (res.status >= 300 && res.status < 400) {
-      const location = res.headers.get('location')
-      if (location) {
-        res = await fetch(location, {
-          method:  'POST',
-          body:    event.body,
-          headers: { 'Content-Type': 'text/plain' },
-        })
-      }
+    const text = await gasRes.text()
+
+    // Validate JSON before returning — if GAS returned HTML/empty, surface real error
+    try {
+      JSON.parse(text)
+    } catch {
+      const preview = text.slice(0, 300).replace(/\s+/g, ' ')
+      return resp({ error: `GAS returned non-JSON (HTTP ${gasRes.status}): ${preview}` })
     }
 
-    const text = await res.text()
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: text,
-    }
+    return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: text }
   } catch (err) {
-    return {
-      statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: `Proxy error: ${err.message}` }),
-    }
+    return resp({ error: `Proxy fetch failed: ${err.message}` })
   }
+}
+
+function resp(obj) {
+  return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj) }
 }
