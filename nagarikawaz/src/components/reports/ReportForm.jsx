@@ -80,6 +80,29 @@ export default function ReportForm() {
     try { const r = await reportsApi.nearby(pos.lat, pos.lng, 100); if (r?.length) setDups(r) } catch {}
   }
 
+  async function compressImage(file) {
+    if (!file.type.startsWith('image/')) return file
+    return new Promise((resolve) => {
+      const img = new Image()
+      const objUrl = URL.createObjectURL(file)
+      img.onload = () => {
+        URL.revokeObjectURL(objUrl)
+        const MAX = 1280
+        const ratio = Math.min(MAX / img.width, MAX / img.height, 1)
+        const canvas = document.createElement('canvas')
+        canvas.width  = Math.round(img.width  * ratio)
+        canvas.height = Math.round(img.height * ratio)
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+        canvas.toBlob(
+          (blob) => resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })),
+          'image/jpeg', 0.82
+        )
+      }
+      img.onerror = () => { URL.revokeObjectURL(objUrl); resolve(file) }
+      img.src = objUrl
+    })
+  }
+
   function handleFileSelect(e) {
     const files = Array.from(e.target.files || []).slice(0, 5 - photos.length)
     if (!files.length) return
@@ -88,10 +111,12 @@ export default function ReportForm() {
     setPhotos((p) => [...p, ...newPhotos])
     files.forEach(async (file, i) => {
       try {
-        const result = await uploadPhoto(file, 'temp')
-        if (!result?.fileId) throw new Error('no fileId')
+        const compressed = await compressImage(file)
+        const result = await uploadPhoto(compressed, 'temp')
+        if (!result?.fileId) throw new Error('no fileId returned')
         setPhotos((p) => p.map((ph, j) => j === baseIdx + i ? { ...ph, fileId: result.fileId, uploading: false } : ph))
-      } catch {
+      } catch (err) {
+        console.error('Photo upload error:', err)
         toast.error(lang === 'ne' ? 'तस्वीर अपलोड असफल' : 'Photo upload failed')
         setPhotos((p) => p.map((ph, j) => j === baseIdx + i ? { ...ph, uploading: false, error: true } : ph))
       }

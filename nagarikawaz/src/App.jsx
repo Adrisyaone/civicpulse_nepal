@@ -1,7 +1,7 @@
 import React, { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import { LangProvider } from './context/LangContext'
+import { LangProvider, useLang } from './context/LangContext'
 import { ErrorBoundary, LoadingScreen } from './components/ui'
 import Navbar from './components/ui/Navbar'
 
@@ -23,6 +23,7 @@ function FloatingReportButton() {
   const { pathname } = useLocation()
   const navigate     = useNavigate()
   const { user }     = useAuth()
+  const { lang }     = useLang()
 
   const hidden = pathname === '/report/new' ||
     pathname.startsWith('/login') ||
@@ -35,10 +36,14 @@ function FloatingReportButton() {
     <button
       onClick={() => navigate(user ? '/report/new' : '/login')}
       title="Report an issue"
-      className="fixed bottom-20 right-4 z-50 w-14 h-14 rounded-full shadow-2xl text-white flex items-center justify-center text-2xl transition-transform hover:scale-110 active:scale-95 md:bottom-8"
-      style={{ background: '#DC143C' }}
+      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-5 py-3 rounded-full text-white font-semibold text-sm transition-all hover:scale-105 active:scale-95 md:bottom-8 md:left-auto md:right-6 md:translate-x-0"
+      style={{
+        background: 'linear-gradient(135deg, #e8183e 0%, #9b0b27 100%)',
+        boxShadow: '0 6px 28px rgba(220,20,60,0.55), 0 2px 8px rgba(0,0,0,0.35)',
+      }}
     >
-      ➕
+      <span className="text-base leading-none">📢</span>
+      <span>{lang === 'ne' ? 'समस्या रिपोर्ट' : 'Report Issue'}</span>
     </button>
   )
 }
