@@ -5,8 +5,8 @@ import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import { useAuth } from '../../context/AuthContext'
 import { useLang } from '../../context/LangContext'
-import { useCreateReport, usePhotoUpload } from '../../hooks'
-import { reportsApi } from '../../services/api'
+import { useCreateReport } from '../../hooks'
+import { reportsApi, uploadPhoto } from '../../services/api'
 import { CATEGORIES, SEVERITIES, PROVINCES, DISTRICTS_BY_PROVINCE, PALIKA_TYPES, DEPARTMENTS, MAP_DEFAULTS } from '../../utils/constants'
 import { Spinner } from '../ui'
 import { cn } from '../../utils/helpers'
@@ -30,7 +30,6 @@ export default function ReportForm() {
   const { user, profile } = useAuth()
   const { lang, tr } = useLang()
   const create     = useCreateReport()
-  const { upload, uploading, fileIds } = usePhotoUpload()
 
   const [step,     setStep]     = useState(1)
   const [pos,      setPos]      = useState(null)
@@ -40,13 +39,14 @@ export default function ReportForm() {
   const [dups,     setDups]     = useState([])
   const [province, setProvince] = useState(profile?.province || '')
   const [district, setDistrict] = useState(profile?.district || '')
-  const [previews, setPreviews] = useState([])
+  // [{ url, fileId, uploading, error }]
+  const [photos,   setPhotos]   = useState([])
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm({
     defaultValues: {
       category: 'road', severity: 'medium',
-      title_np: '', title_en: '',
-      description_np: '', description_en: '',
+      title: '',
+      description: '',
       palika: profile?.palika || '', palika_type: 'nagarpalika',
       ward_no: profile?.ward_no || '',
     },
@@ -76,29 +76,49 @@ export default function ReportForm() {
   function handleMapMove(ll) { setPos(ll); rgeo(ll.lat, ll.lng) }
 
   async function checkDups() {
-    if (!pos || !watch('title_en') || watch('title_en').length < 5) return
+    if (!pos || !watch('title') || watch('title').length < 5) return
     try { const r = await reportsApi.nearby(pos.lat, pos.lng, 100); if (r?.length) setDups(r) } catch {}
   }
 
   function handleFileSelect(e) {
-    const files = Array.from(e.target.files || []).slice(0, 5 - previews.length)
-    setPreviews((p) => [...p, ...files.map((f) => ({ file: f, url: URL.createObjectURL(f) }))])
-    upload(files)
+    const files = Array.from(e.target.files || []).slice(0, 5 - photos.length)
+    if (!files.length) return
+    const baseIdx = photos.length
+    const newPhotos = files.map((f) => ({ url: URL.createObjectURL(f), fileId: null, uploading: true, error: false }))
+    setPhotos((p) => [...p, ...newPhotos])
+    files.forEach(async (file, i) => {
+      try {
+        const result = await uploadPhoto(file, 'temp')
+        if (!result?.fileId) throw new Error('no fileId')
+        setPhotos((p) => p.map((ph, j) => j === baseIdx + i ? { ...ph, fileId: result.fileId, uploading: false } : ph))
+      } catch {
+        toast.error(lang === 'ne' ? 'तस्वीर अपलोड असफल' : 'Photo upload failed')
+        setPhotos((p) => p.map((ph, j) => j === baseIdx + i ? { ...ph, uploading: false, error: true } : ph))
+      }
+    })
+  }
+
+  function removePhoto(i) {
+    setPhotos((prev) => {
+      URL.revokeObjectURL(prev[i]?.url)
+      return prev.filter((_, j) => j !== i)
+    })
   }
 
   async function onSubmit(data) {
     if (!pos) { toast.error('Please pin the location'); setStep(2); return }
     if (!user) { navigate('/login'); return }
+    if (photos.some((p) => p.uploading)) { toast.error(lang === 'ne' ? 'तस्वीर अपलोड हुँदैछ…' : 'Photos still uploading…'); return }
     await create.mutateAsync({
-      title_np: data.title_np, title_en: data.title_en || data.title_np,
-      description_np: data.description_np, description_en: data.description_en || data.description_np,
+      title_np: data.title, title_en: data.title,
+      description_np: data.description, description_en: data.description,
       category: data.category, severity: data.severity,
       lat: pos.lat, lng: pos.lng,
       address_np: addrNp, address_en: addrEn,
       province, district,
       palika: data.palika, palika_type: data.palika_type,
       ward_no: data.ward_no,
-      photo_ids: fileIds.join(','),
+      photo_ids: photos.filter((p) => p.fileId).map((p) => p.fileId).join(','),
       submitted_by:    profile?.name_np || profile?.name_en || user.email,
       submitter_phone: profile?.phone || '',
       status: 'darta',
@@ -176,19 +196,14 @@ export default function ReportForm() {
                 </div>
               </div>
 
-              {/* Title NP */}
+              {/* Title */}
               <div>
-                <label className="label">{tr('titleNpLabel')} *</label>
-                <input {...register('title_np', { required: lang === 'ne' ? 'शीर्षक आवश्यक छ' : 'Title is required' })}
-                  className="input" placeholder={tr('titleNpPH')} />
-                {errors.title_np && <p className="text-red-400 text-xs mt-1">{errors.title_np.message}</p>}
-              </div>
-
-              {/* Title EN */}
-              <div>
-                <label className="label">Title (English)</label>
-                <input {...register('title_en')} className="input"
-                  placeholder="e.g. Large pothole on main road" onBlur={checkDups} />
+                <label className="label">{lang === 'ne' ? 'शीर्षक *' : 'Title *'}</label>
+                <input {...register('title', { required: lang === 'ne' ? 'शीर्षक आवश्यक छ' : 'Title is required' })}
+                  className="input"
+                  placeholder={lang === 'ne' ? 'जस्तै: मुख्य सडकमा ठूलो खाडल' : 'e.g. Large pothole on main road'}
+                  onBlur={checkDups} />
+                {errors.title && <p className="text-red-400 text-xs mt-1">{errors.title.message}</p>}
               </div>
 
               {/* Duplicate warning */}
@@ -203,22 +218,16 @@ export default function ReportForm() {
                 </div>
               )}
 
-              {/* Desc NP */}
+              {/* Description */}
               <div>
-                <label className="label">{tr('descNpLabel')} *</label>
-                <textarea {...register('description_np', {
+                <label className="label">{lang === 'ne' ? 'विवरण *' : 'Description *'}</label>
+                <textarea {...register('description', {
                   required: lang === 'ne' ? 'विवरण आवश्यक छ' : 'Description is required',
                   minLength: { value: 10, message: lang === 'ne' ? 'कम्तीमा १० अक्षर' : 'Min 10 characters' }
                 })}
-                  className="input resize-none" rows={3} placeholder={tr('descNpPH')} />
-                {errors.description_np && <p className="text-red-400 text-xs mt-1">{errors.description_np.message}</p>}
-              </div>
-
-              {/* Desc EN */}
-              <div>
-                <label className="label">Description (English)</label>
-                <textarea {...register('description_en')} className="input resize-none" rows={2}
-                  placeholder="Describe the issue…" />
+                  className="input resize-none" rows={3}
+                  placeholder={lang === 'ne' ? 'समस्याको विवरण लेख्नुहोस्…' : 'Describe the issue in detail…'} />
+                {errors.description && <p className="text-red-400 text-xs mt-1">{errors.description.message}</p>}
               </div>
 
               {/* Severity */}
@@ -334,24 +343,31 @@ export default function ReportForm() {
                 <label className="label">{tr('photosOptional')}</label>
                 <label className={cn(
                   'flex flex-col items-center justify-center h-28 border-2 border-dashed rounded-xl cursor-pointer transition-all',
-                  previews.length >= 5 ? 'opacity-40 cursor-not-allowed' : 'border-slate-700 hover:border-brand-600 hover:bg-slate-800/30'
+                  photos.length >= 5 ? 'opacity-40 cursor-not-allowed' : 'border-slate-700 hover:border-brand-600 hover:bg-slate-800/30'
                 )}>
                   <input type="file" accept="image/*" multiple className="sr-only"
-                    disabled={previews.length >= 5} onChange={handleFileSelect} />
+                    disabled={photos.length >= 5} onChange={handleFileSelect} />
                   <span className="text-2xl mb-1">📸</span>
                   <span className="text-xs text-slate-400">{tr('addPhotos')}</span>
                   <span className="text-xs text-slate-600 mt-0.5">JPG, PNG · max 10MB</span>
                 </label>
-                {previews.length > 0 && (
+                {photos.length > 0 && (
                   <div className="grid grid-cols-4 gap-2 mt-2">
-                    {previews.map((p, i) => (
+                    {photos.map((p, i) => (
                       <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-slate-800">
                         <img src={p.url} alt="" className="w-full h-full object-cover" />
-                        {uploading && i === previews.length - 1 && (
+                        {p.uploading && (
                           <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Spinner size="sm" /></div>
                         )}
-                        <button type="button"
-                          onClick={() => setPreviews((prev) => prev.filter((_, j) => j !== i))}
+                        {p.error && (
+                          <div className="absolute inset-0 bg-red-900/60 flex items-center justify-center">
+                            <span className="text-red-300 text-xs font-medium">✗</span>
+                          </div>
+                        )}
+                        {p.fileId && !p.uploading && (
+                          <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-green-600/90 text-white flex items-center justify-center text-xs">✓</div>
+                        )}
+                        <button type="button" onClick={() => removePhoto(i)}
                           className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-red-600/90 text-white text-xs flex items-center justify-center">×</button>
                       </div>
                     ))}
@@ -367,7 +383,7 @@ export default function ReportForm() {
                   [lang === 'ne' ? 'गम्भीरता' : 'Severity', SEVERITIES[watch('severity')]?.[lang === 'ne' ? 'np' : 'en']],
                   [lang === 'ne' ? 'पालिका' : 'Palika', watch('palika')],
                   [lang === 'ne' ? 'वडा' : 'Ward', watch('ward_no')],
-                  [lang === 'ne' ? 'तस्वीर' : 'Photos', `${fileIds.length} ${tr('uploaded')}`],
+                  [lang === 'ne' ? 'तस्वीर' : 'Photos', `${photos.filter((p) => p.fileId).length}/${photos.length} ${tr('uploaded')}`],
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between text-sm">
                     <span className="text-slate-500">{k}</span>
@@ -380,7 +396,9 @@ export default function ReportForm() {
                 <button type="button" className="btn-ghost flex-1 justify-center" onClick={() => setStep(2)}>
                   ← {tr('back')}
                 </button>
-                <button type="submit" disabled={create.isPending || uploading} className="btn-nepal flex-1 justify-center">
+                <button type="submit"
+                  disabled={create.isPending || photos.some((p) => p.uploading)}
+                  className="btn-nepal flex-1 justify-center">
                   {create.isPending
                     ? <><Spinner size="sm" /> {tr('submitting')}</>
                     : `✓ ${tr('darta')}`

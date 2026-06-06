@@ -15,7 +15,7 @@ export default function MapView({ filters = {} }) {
   const navigate   = useNavigate()
   const { lang, tr } = useLang()
   const { location, getLocation } = useGeolocation()
-  const { data: reports, isLoading } = useReports(filters)
+  const { data: reports, isLoading } = useReports(filters, { refetchInterval: 60000 })
   const [selected,  setSelected]  = useState(null)
   const [satellite, setSatellite] = useState(false)
 

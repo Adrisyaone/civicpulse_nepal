@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { LangProvider } from './context/LangContext'
 import { ErrorBoundary, LoadingScreen } from './components/ui'
@@ -18,6 +18,30 @@ const RegisterPage  = lazy(() => import('./pages/RegisterPage'))
 const SettingsPage  = lazy(() => import('./pages/SettingsPage'))
 const AuthCallback  = lazy(() => import('./pages/AuthCallback'))
 const NotFoundPage  = lazy(() => import('./pages/NotFoundPage'))
+
+function FloatingReportButton() {
+  const { pathname } = useLocation()
+  const navigate     = useNavigate()
+  const { user }     = useAuth()
+
+  const hidden = pathname === '/report/new' ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/register') ||
+    pathname.startsWith('/auth/')
+
+  if (hidden) return null
+
+  return (
+    <button
+      onClick={() => navigate(user ? '/report/new' : '/login')}
+      title="Report an issue"
+      className="fixed bottom-20 right-4 z-50 w-14 h-14 rounded-full shadow-2xl text-white flex items-center justify-center text-2xl transition-transform hover:scale-110 active:scale-95 md:bottom-8"
+      style={{ background: '#DC143C' }}
+    >
+      ➕
+    </button>
+  )
+}
 
 function ProtectedRoute({ children, minRole = 'nagarik' }) {
   const { user, loading, hasPermission } = useAuth()
@@ -59,6 +83,7 @@ function AppRoutes() {
           </Routes>
         </Suspense>
       </main>
+      <FloatingReportButton />
     </div>
   )
 }

@@ -25,8 +25,8 @@ export function useGeolocation() {
 }
 
 // ── Reports ───────────────────────────────────────────────────────────────────
-export function useReports(filters = {}) {
-  return useQuery({ queryKey: ['reports', filters], queryFn: () => reportsApi.list(filters), staleTime: 120000, retry: 2 })
+export function useReports(filters = {}, options = {}) {
+  return useQuery({ queryKey: ['reports', filters], queryFn: () => reportsApi.list(filters), staleTime: 120000, retry: 2, ...options })
 }
 
 export function useReport(id) {
