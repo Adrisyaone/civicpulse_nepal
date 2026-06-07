@@ -7,7 +7,8 @@ import { useAuth } from '../../context/AuthContext'
 import { useLang } from '../../context/LangContext'
 import { useCreateReport } from '../../hooks'
 import { reportsApi, uploadPhoto } from '../../services/api'
-import { CATEGORIES, SEVERITIES, PROVINCES, DISTRICTS_BY_PROVINCE, PALIKA_TYPES, DEPARTMENTS, MAP_DEFAULTS } from '../../utils/constants'
+import { CATEGORIES, SEVERITIES, PROVINCES, PALIKA_TYPES, DEPARTMENTS, MAP_DEFAULTS } from '../../utils/constants'
+import { NEPAL_GEO } from '../../utils/nepalGeo'
 import { Spinner } from '../ui'
 import { cn } from '../../utils/helpers'
 import toast from 'react-hot-toast'
@@ -39,10 +40,11 @@ export default function ReportForm() {
   const [dups,     setDups]     = useState([])
   const [province, setProvince] = useState(profile?.province || '')
   const [district, setDistrict] = useState(profile?.district || '')
+  const [palika,   setPalika]   = useState(profile?.palika   || '')
   // [{ url, fileId, uploading, error }]
   const [photos,   setPhotos]   = useState([])
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
       category: 'road', severity: 'medium',
       title: '',
@@ -141,7 +143,7 @@ export default function ReportForm() {
       lat: pos.lat, lng: pos.lng,
       address_np: addrNp, address_en: addrEn,
       province, district,
-      palika: data.palika, palika_type: data.palika_type,
+      palika: palika || data.palika, palika_type: data.palika_type,
       ward_no: data.ward_no,
       photo_ids: photos.filter((p) => p.fileId).map((p) => p.fileId).join(','),
       submitted_by:    profile?.name_np || profile?.name_en || user.email,
@@ -163,7 +165,9 @@ export default function ReportForm() {
   )
 
   const steps = [{ n: 1, np: 'विवरण', en: 'Details' }, { n: 2, np: 'स्थान', en: 'Location' }, { n: 3, np: 'तस्वीर', en: 'Photos' }]
-  const provinceObj = PROVINCES.find((p) => p.name_en === province)
+  const provinceObj  = PROVINCES.find((p) => p.name_en === province)
+  const districtList = provinceObj ? Object.keys(NEPAL_GEO[provinceObj.id] || {}) : []
+  const palikaList   = (district && provinceObj) ? (NEPAL_GEO[provinceObj.id]?.[district] || []) : []
 
   return (
     <div className="min-h-screen pt-4 pb-10 px-3">
@@ -272,11 +276,12 @@ export default function ReportForm() {
                 </div>
               </div>
 
-              {/* Nepal admin hierarchy */}
+              {/* Nepal admin hierarchy — cascade from shapefile data */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label">{tr('province')}</label>
-                  <select value={province} onChange={(e) => { setProvince(e.target.value); setDistrict('') }}
+                  <select value={province}
+                    onChange={(e) => { setProvince(e.target.value); setDistrict(''); setPalika('') }}
                     className="input text-sm">
                     <option value="">{tr('selectOpt')}</option>
                     {PROVINCES.map((p) => (
@@ -286,12 +291,11 @@ export default function ReportForm() {
                 </div>
                 <div>
                   <label className="label">{tr('district')}</label>
-                  <select value={district} onChange={(e) => setDistrict(e.target.value)}
+                  <select value={district}
+                    onChange={(e) => { setDistrict(e.target.value); setPalika('') }}
                     className="input text-sm" disabled={!province}>
                     <option value="">{tr('selectOpt')}</option>
-                    {(DISTRICTS_BY_PROVINCE[provinceObj?.id] || []).map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
+                    {districtList.map((d) => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
               </div>
@@ -299,8 +303,23 @@ export default function ReportForm() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label">{tr('palika')} *</label>
-                  <input {...register('palika', { required: lang === 'ne' ? 'पालिका आवश्यक छ' : 'Palika is required' })}
-                    className="input text-sm" placeholder={tr('palikaPHLabel')} />
+                  <select value={palika}
+                    onChange={(e) => {
+                      const sel = palikaList.find(p => p.name === e.target.value)
+                      setPalika(e.target.value)
+                      // Auto-set palika_type from shapefile
+                      if (sel) setValue('palika_type', sel.type)
+                      setValue('palika', e.target.value)
+                    }}
+                    className="input text-sm" disabled={!district}>
+                    <option value="">{tr('selectOpt')}</option>
+                    {palikaList.map((p) => (
+                      <option key={p.name} value={p.name}>
+                        {p.name} ({PALIKA_TYPES[p.type]?.[lang === 'ne' ? 'np' : 'en'] || p.type})
+                      </option>
+                    ))}
+                  </select>
+                  <input type="hidden" {...register('palika', { required: lang === 'ne' ? 'पालिका आवश्यक छ' : 'Palika is required' })} />
                   {errors.palika && <p className="text-red-400 text-xs mt-1">{errors.palika.message}</p>}
                 </div>
                 <div>

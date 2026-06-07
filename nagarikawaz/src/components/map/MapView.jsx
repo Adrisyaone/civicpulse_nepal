@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet.markercluster'
 import { useNavigate } from 'react-router-dom'
@@ -17,9 +17,18 @@ export default function MapView({ filters = {} }) {
   const { location, getLocation } = useGeolocation()
   const { data: reports, isLoading } = useReports(filters, { refetchInterval: 60000 })
   const [selected,    setSelected]    = useState(null)
-  const [satellite,   setSatellite]   = useState(false)
+  const [mapType,     setMapType]     = useState('osm')
+  const [showBounds,  setShowBounds]  = useState(false)
   const [upvotedIds,  setUpvotedIds]  = useState(new Set())
+  const boundsRef = useRef(null)
   const upvote = useUpvoteReport()
+
+  const TILE_LAYERS = {
+    osm:   { label: '🗺️ Street',    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',         attr: '© OpenStreetMap' },
+    sat:   { label: '🛰️ Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr: '© Esri' },
+    topo:  { label: '⛰️ Topo',      url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',             attr: '© OpenTopoMap' },
+    dark:  { label: '🌙 Dark',      url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', attr: '© CartoDB' },
+  }
 
   // ── Init map ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -31,16 +40,8 @@ export default function MapView({ filters = {} }) {
       maxZoom: MAP_DEFAULTS.maxZoom,
     })
 
-    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap', maxZoom: 19,
-    }).addTo(map)
-
-    const sat = L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      { attribution: '© Esri', maxZoom: 19 }
-    )
-
-    map._osm = osm; map._sat = sat
+    const tl = L.tileLayer(TILE_LAYERS.osm.url, { attribution: TILE_LAYERS.osm.attr, maxZoom: 19 }).addTo(map)
+    map._activeTile = tl
 
     const cluster = L.markerClusterGroup({ maxClusterRadius: 60, disableClusteringAtZoom: 15, spiderfyOnMaxZoom: true })
     map.addLayer(cluster)
@@ -49,6 +50,34 @@ export default function MapView({ filters = {} }) {
 
     return () => { map.remove(); mapInst.current = null }
   }, [])
+
+  // ── Swap tile layer when mapType changes ──────────────────────────────────────
+  useEffect(() => {
+    const map = mapInst.current
+    if (!map) return
+    if (map._activeTile) map.removeLayer(map._activeTile)
+    const cfg = TILE_LAYERS[mapType]
+    map._activeTile = L.tileLayer(cfg.url, { attribution: cfg.attr, maxZoom: 19 }).addTo(map)
+  }, [mapType])
+
+  // ── District boundary layer ───────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapInst.current
+    if (!map) return
+    if (boundsRef.current) { map.removeLayer(boundsRef.current); boundsRef.current = null }
+    if (!showBounds) return
+    fetch('/nepal-districts.geojson')
+      .then((r) => r.json())
+      .then((gj) => {
+        boundsRef.current = L.geoJSON(gj, {
+          style: { color: '#94a3b8', weight: 1, fillOpacity: 0, opacity: 0.5 },
+          onEachFeature: (feat, layer) => {
+            layer.bindTooltip(feat.properties.name, { permanent: false, sticky: true, className: 'map-tooltip' })
+          },
+        }).addTo(map)
+      })
+      .catch(() => {})
+  }, [showBounds])
 
   // ── Markers ───────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -69,12 +98,7 @@ export default function MapView({ filters = {} }) {
     mapInst.current.flyTo([location.lat, location.lng], 14, { duration: 1 })
   }, [location])
 
-  const toggleSat = useCallback(() => {
-    const map = mapInst.current; if (!map) return
-    if (!satellite) { map.removeLayer(map._osm); map._sat.addTo(map) }
-    else            { map.removeLayer(map._sat); map._osm.addTo(map) }
-    setSatellite((s) => !s)
-  }, [satellite])
+  const [showMapMenu, setShowMapMenu] = useState(false)
 
   const titleField = (r) => lang === 'ne' ? (r.title_np || r.title_en) : (r.title_en || r.title_np)
   const descField  = (r) => lang === 'ne' ? (r.description_np || r.description_en) : (r.description_en || r.description_np)
@@ -94,10 +118,37 @@ export default function MapView({ filters = {} }) {
       <div className="absolute top-4 right-4 z-30 flex flex-col gap-2">
         <button onClick={getLocation} title="My location"
           className="glass w-9 h-9 rounded-lg flex items-center justify-center hover:bg-white/10 text-brand-400 transition-all text-base">📍</button>
-        <button onClick={toggleSat}
-          className="glass w-9 h-9 rounded-lg flex items-center justify-center hover:bg-white/10 text-brand-400 transition-all text-base">
-          {satellite ? '🗺️' : '🛰️'}
-        </button>
+
+        {/* Map type picker */}
+        <div className="relative">
+          <button onClick={() => setShowMapMenu((s) => !s)}
+            title="Change map type"
+            className="glass w-9 h-9 rounded-lg flex items-center justify-center hover:bg-white/10 text-brand-400 transition-all text-base">
+            {TILE_LAYERS[mapType].label.split(' ')[0]}
+          </button>
+          {showMapMenu && (
+            <>
+              <div className="fixed inset-0 z-20" onClick={() => setShowMapMenu(false)} />
+              <div className="absolute right-10 top-0 z-30 glass rounded-xl shadow-xl overflow-hidden min-w-[140px]">
+                {Object.entries(TILE_LAYERS).map(([k, v]) => (
+                  <button key={k} onClick={() => { setMapType(k); setShowMapMenu(false) }}
+                    className={cn('w-full text-left px-3 py-2 text-sm transition-all hover:bg-white/10',
+                      mapType === k ? 'text-brand-400 bg-brand-900/30' : 'text-slate-300')}>
+                    {v.label}
+                  </button>
+                ))}
+                <div className="border-t border-slate-700/50 px-3 py-2">
+                  <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                    <input type="checkbox" checked={showBounds} onChange={(e) => setShowBounds(e.target.checked)}
+                      className="accent-brand-500" />
+                    🗾 Districts
+                  </label>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
         <button onClick={() => navigate('/report/new')}
           className="w-9 h-9 rounded-lg flex items-center justify-center transition-all text-white shadow-lg text-base"
           style={{ background: '#DC143C' }}>➕</button>

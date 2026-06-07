@@ -9,19 +9,9 @@ export const PROVINCES = [
   { id: '7', name_en: 'Sudurpashchim Province',  name_np: 'सुदूरपश्चिम प्रदेश',  color: '#c0392b' },
 ]
 
-export const DISTRICTS_BY_PROVINCE = {
-  '1': ['Taplejung','Panchthar','Ilam','Jhapa','Morang','Sunsari','Dhankuta','Terhathum','Sankhuwasabha','Bhojpur','Solukhumbu','Okhaldhunga','Khotang','Udayapur'],
-  '2': ['Saptari','Siraha','Dhanusha','Mahottari','Sarlahi','Rautahat','Bara','Parsa'],
-  '3': ['Dolakha','Sindhupalchok','Rasuwa','Nuwakot','Dhading','Makwanpur','Kathmandu','Bhaktapur','Lalitpur','Kavrepalanchok','Ramechhap','Sindhuli','Chitwan'],
-  '4': ['Gorkha','Manang','Mustang','Myagdi','Kaski','Lamjung','Tanahu','Nawalpur','Syangja','Parbat','Baglung'],
-  '5': ['Rukum East','Rolpa','Pyuthan','Gulmi','Arghakhanchi','Palpa','Nawalparasi East','Rupandehi','Kapilvastu','Dang','Banke','Bardiya'],
-  '6': ['Dolpa','Mugu','Humla','Jumla','Kalikot','Dailekh','Jajarkot','Rukum West','Salyan','Surkhet'],
-  '7': ['Bajura','Bajhang','Darchula','Baitadi','Dadeldhura','Doti','Achham','Kailali','Kanchanpur'],
-}
-
 export const PALIKA_TYPES = {
   mahanagarpalika:     { en: 'Metropolitan City',     np: 'महानगरपालिका' },
-  upa_mahanagarpalika: { en: 'Sub-Metropolitan City', np: 'उप-महानगरपालिका' },
+  upamahanagarpalika:  { en: 'Sub-Metropolitan City', np: 'उप-महानगरपालिका' },
   nagarpalika:         { en: 'Municipality',          np: 'नगरपालिका' },
   gaunpalika:          { en: 'Rural Municipality',    np: 'गाउँपालिका' },
 }
