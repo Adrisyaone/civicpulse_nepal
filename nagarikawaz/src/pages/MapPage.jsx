@@ -29,7 +29,7 @@ export default function MapPage() {
         {showF && (
           <>
             <div className="absolute inset-0 z-20" onClick={() => setShowF(false)} />
-            <div className="absolute top-14 left-3 z-30 w-60 card p-4 shadow-xl max-h-[calc(100vh-160px)] overflow-y-auto animate-slide-up">
+            <div className="absolute top-14 left-3 w-60 card p-4 shadow-xl max-h-[calc(100vh-160px)] overflow-y-auto animate-slide-up" style={{ zIndex: 900 }}>
               <p className="label mb-2">{tr('category')}</p>
               <div className="space-y-1 mb-4">
                 {Object.entries(CATEGORIES).map(([k, v]) => (
