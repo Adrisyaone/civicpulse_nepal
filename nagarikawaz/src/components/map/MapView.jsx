@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react'
 import L from 'leaflet'
 import 'leaflet.markercluster'
 import { useNavigate } from 'react-router-dom'
-import { useReports, useGeolocation } from '../../hooks'
+import { useReports, useGeolocation, useUpvoteReport } from '../../hooks'
 import { createMarkerIcon, timeAgo, cn } from '../../utils/helpers'
 import { CATEGORIES, MAP_DEFAULTS } from '../../utils/constants'
 import { CategoryBadge, SeverityBadge, StatusBadge, Spinner } from '../ui'
@@ -16,8 +16,10 @@ export default function MapView({ filters = {} }) {
   const { lang, tr } = useLang()
   const { location, getLocation } = useGeolocation()
   const { data: reports, isLoading } = useReports(filters, { refetchInterval: 60000 })
-  const [selected,  setSelected]  = useState(null)
-  const [satellite, setSatellite] = useState(false)
+  const [selected,    setSelected]    = useState(null)
+  const [satellite,   setSatellite]   = useState(false)
+  const [upvotedIds,  setUpvotedIds]  = useState(new Set())
+  const upvote = useUpvoteReport()
 
   // ── Init map ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -140,7 +142,25 @@ export default function MapView({ filters = {} }) {
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-600">{timeAgo(selected.created_at)}</span>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-slate-500">👍 {selected.upvotes || 0}</span>
+                <button
+                  disabled={upvote.isPending || upvotedIds.has(selected.id)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    upvote.mutate(selected.id, {
+                      onSuccess: () => {
+                        setUpvotedIds((s) => new Set([...s, selected.id]))
+                        setSelected((r) => ({ ...r, upvotes: String((Number(r.upvotes) || 0) + 1) }))
+                      },
+                    })
+                  }}
+                  className={cn(
+                    'text-xs px-2 py-1 rounded-full border transition-all',
+                    upvotedIds.has(selected.id)
+                      ? 'border-brand-700 text-brand-400 bg-brand-900/30 cursor-default'
+                      : 'border-slate-700 text-slate-400 hover:border-brand-600 hover:text-brand-400'
+                  )}>
+                  👍 {selected.upvotes || 0}
+                </button>
                 <button onClick={() => { navigate(`/report/${selected.id}`); setSelected(null) }}
                   className="btn-primary py-1 px-3 text-xs">
                   {tr('viewDetails')} →

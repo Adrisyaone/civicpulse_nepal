@@ -636,3 +636,41 @@ function setupSpreadsheet() {
 function testPing() {
   Logger.log(doGet({ parameter: { action: 'ping' } }).getContent())
 }
+
+// Run this ONCE from the editor to grant Drive authorization to the web app.
+// After it logs "Drive OK", redeploy → photo upload will work.
+function authorizeDrive() {
+  var folder = getOrCreateFolder('photos')
+  Logger.log('Drive OK — photos folder: ' + folder.getName() + ' | id: ' + folder.getId())
+}
+
+// Safe fix: rewrites row 1 headers on every sheet without touching data rows.
+// Run this if columns are misaligned but you want to keep existing rows.
+function fixHeaders() {
+  var ss = SpreadsheetApp.openById(SS_ID)
+  Object.keys(HEADERS).forEach(function(name) {
+    var sh = ss.getSheetByName(name)
+    if (!sh) {
+      sh = ss.insertSheet(name)
+      Logger.log('Created sheet: ' + name)
+    }
+    var h = HEADERS[name]
+    sh.getRange(1, 1, 1, h.length).setValues([h])
+    sh.getRange(1, 1, 1, h.length).setFontWeight('bold')
+    Logger.log('Headers written: ' + name + ' (' + h.length + ' cols)')
+  })
+  Logger.log('Done — all sheet headers corrected.')
+}
+
+// Nuclear reset: clears ALL data + headers from every sheet, then writes correct headers.
+// Use this when data rows are also wrong. You will lose all existing data.
+function resetAllSheets() {
+  var ss = SpreadsheetApp.openById(SS_ID)
+  Object.keys(HEADERS).forEach(function(name) {
+    var sh = ss.getSheetByName(name) || ss.insertSheet(name)
+    sh.clearContents()
+    initHeaders(sh, name)
+    Logger.log('Reset: ' + name)
+  })
+  Logger.log('All sheets reset with correct headers. Old data cleared.')
+}
