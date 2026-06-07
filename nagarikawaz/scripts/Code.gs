@@ -63,7 +63,8 @@ function doGet(e) {
       case 'listAIReports':      result = listAIReports();         break
       case 'prioritizeReport':   result = prioritizeReport(p.id); break
       // Weekly reports
-      case 'getWeeklyReports':   result = getWeeklyReports();     break
+      case 'getWeeklyReports':    result = getWeeklyReports();          break
+      case 'triggerWeeklyReport': result = generateWeeklyReport();      break
       // Drive
       case 'uploadPhoto':        result = uploadPhoto(p);          break
       // Health
@@ -316,6 +317,8 @@ function upsertUser(p) {
     name_en:          sanitize(p.name_en     || ''),
     email:            sanitize(p.email       || ''),
     phone:            sanitize(p.phone       || ''),
+    gender:           sanitize(p.gender      || ''),
+    occupation:       sanitize(p.occupation  || ''),
     role:             p.role || 'nagarik',
     province:         sanitize(p.province    || ''),
     district:         sanitize(p.district    || ''),
@@ -553,7 +556,7 @@ function getSheet(name) {
 
 var HEADERS = {
   Reports:        ['id','title_np','title_en','description_np','description_en','category','severity','lat','lng','province','district','palika','palika_type','ward_no','address_np','address_en','status','priority_score','department','submitted_by','submitter_phone','photo_ids','upvotes','comments_count','created_at','updated_at','resolved_at'],
-  Users:          ['id','supabase_user_id','name_np','name_en','email','phone','role','province','district','palika','ward_no','department','created_at','status'],
+  Users:          ['id','supabase_user_id','name_np','name_en','email','phone','gender','occupation','role','province','district','palika','ward_no','department','created_at','status'],
   Comments:       ['id','report_id','user_id','user_name','comment_np','comment_en','created_at'],
   ProgressUpdates:['id','report_id','officer','status','progress_percent','note_np','note_en','department','timestamp'],
   Departments:    ['id','dept_name_np','dept_name_en','palika','district','lead_email','lead_phone'],

@@ -75,7 +75,9 @@
 }
 
 /* ── Leaflet overrides ───────────────────────────────────────────────────── */
-.leaflet-container { background: #0a1a0c !important; font-family: 'Mukta', sans-serif; }
+/* Isolate Leaflet's internal stacking context so panes (z 200-700) don't
+   bleed above React controls positioned outside the map div */
+.leaflet-container { background: #0a1a0c !important; font-family: 'Mukta', sans-serif; isolation: isolate; }
 .leaflet-popup-content-wrapper {
   background: #0d1a0f !important; border: 1px solid #1f7350 !important;
   border-radius: 12px !important; color: #e8f5ee !important; padding: 0 !important;
