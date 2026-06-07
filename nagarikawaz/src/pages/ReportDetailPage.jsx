@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker } from 'react-leaflet'
 import L from 'leaflet'
-import { useReport, useUpdateReport, useUpvoteReport } from '../hooks'
+import { useReport, useUpdateReport, useUpvoteReport, getLocalUpvoted } from '../hooks'
 import { useAuth } from '../context/AuthContext'
 import { useLang } from '../context/LangContext'
 import { CategoryBadge, SeverityBadge, StatusBadge, ProgressBar, Spinner, EmptyState, Modal, WardTag } from '../components/ui'
@@ -26,8 +26,11 @@ export default function ReportDetailPage() {
   const update  = useUpdateReport()
   const upvote  = useUpvoteReport()
 
-  const [tab,     setTab]    = useState('timeline')
-  const [aModal,  setAModal] = useState(false)
+  const [tab,          setTab]    = useState('timeline')
+  const [aModal,       setAModal] = useState(false)
+  const [alreadyVoted, setVoted]  = useState(false)
+  // Sync voted state once report id is known
+  React.useEffect(() => { if (r?.id) setVoted(getLocalUpvoted().has(String(r.id))) }, [r?.id])
   const [aForm,   setAForm]  = useState({ department: '', status: '' })
   const [lbox,    setLbox]   = useState(null)
 
@@ -148,9 +151,11 @@ export default function ReportDetailPage() {
               <div className="w-px bg-slate-800" />
               <div><div className="font-display font-bold text-2xl text-white">{r.comments_count || 0}</div><div className="text-xs text-slate-500">{tr('comment')}</div></div>
             </div>
-            <button onClick={() => upvote.mutate(r.id)} disabled={upvote.isPending}
-              className="btn-ghost w-full justify-center mt-3 text-sm">
-              👍 {lang === 'ne' ? 'समर्थन गर्नुहोस्' : 'Upvote'}
+            <button
+              onClick={() => upvote.mutate(r.id, { onSuccess: (d) => { if (!d?.alreadyVoted) setVoted(true) } })}
+              disabled={upvote.isPending || alreadyVoted}
+              className={cn('w-full justify-center mt-3 text-sm', alreadyVoted ? 'btn-ghost opacity-50 cursor-default' : 'btn-ghost')}>
+              👍 {alreadyVoted ? (lang === 'ne' ? 'मत दिइसक्यो' : 'Already voted') : (lang === 'ne' ? 'समर्थन गर्नुहोस्' : 'Upvote')}
             </button>
           </div>
 

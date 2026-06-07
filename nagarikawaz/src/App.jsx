@@ -13,6 +13,7 @@ const MyReports     = lazy(() => import('./pages/MyReportsPage'))
 const Dashboard     = lazy(() => import('./pages/DashboardPage'))
 const AIReports     = lazy(() => import('./pages/AIReportsPage'))
 const AdminPage     = lazy(() => import('./pages/AdminPage'))
+const WeeklyReports = lazy(() => import('./pages/WeeklyReportsPage'))
 const LoginPage     = lazy(() => import('./pages/LoginPage'))
 const RegisterPage  = lazy(() => import('./pages/RegisterPage'))
 const SettingsPage  = lazy(() => import('./pages/SettingsPage'))
@@ -28,7 +29,8 @@ function FloatingReportButton() {
   const hidden = pathname === '/report/new' ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/register') ||
-    pathname.startsWith('/auth/')
+    pathname.startsWith('/auth/') ||
+    pathname.startsWith('/weekly-reports')
 
   if (hidden) return null
 
@@ -70,7 +72,8 @@ function AppRoutes() {
         <Suspense fallback={<LoadingScreen />}>
           <Routes>
             <Route path="/"              element={<MapPage />} />
-            <Route path="/feed"          element={<FeedPage />} />
+            <Route path="/feed"           element={<FeedPage />} />
+            <Route path="/weekly-reports" element={<WeeklyReports />} />
             <Route path="/report/:id"    element={<ReportDetail />} />
             <Route path="/login"         element={<LoginPage />} />
             <Route path="/register"      element={<RegisterPage />} />

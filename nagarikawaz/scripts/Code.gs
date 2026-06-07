@@ -15,6 +15,7 @@ var SHEETS = {
   PROGRESS: 'ProgressUpdates',
   DEPTS:    'Departments',
   AI:       'AIReports',
+  WEEKLY:   'WeeklyReports',
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -61,6 +62,8 @@ function doGet(e) {
       case 'generateAIReport':   result = generateAIReport(p);    break
       case 'listAIReports':      result = listAIReports();         break
       case 'prioritizeReport':   result = prioritizeReport(p.id); break
+      // Weekly reports
+      case 'getWeeklyReports':   result = getWeeklyReports();     break
       // Drive
       case 'uploadPhoto':        result = uploadPhoto(p);          break
       // Health
@@ -555,6 +558,7 @@ var HEADERS = {
   ProgressUpdates:['id','report_id','officer','status','progress_percent','note_np','note_en','department','timestamp'],
   Departments:    ['id','dept_name_np','dept_name_en','palika','district','lead_email','lead_phone'],
   AIReports:      ['id','title','province','district','palika','report_count','summary_json','doc_url','created_at'],
+  WeeklyReports:  ['id','title','period_start','period_end','report_count','doc_url','pdf_url','summary_json','created_at'],
 }
 
 function initHeaders(sheet, name) {
@@ -617,6 +621,284 @@ function json(data) {
   var out = ContentService.createTextOutput(JSON.stringify(data))
   out.setMimeType(ContentService.MimeType.JSON)
   return out
+}
+
+// =============================================================================
+// WEEKLY REPORTS — Auto-generated every Monday via time-based trigger
+// =============================================================================
+
+function getWeeklyReports() {
+  return readSheet(getSheet(SHEETS.WEEKLY))
+    .sort(function(a,b){ return new Date(b.created_at) - new Date(a.created_at) })
+    .map(function(r){
+      var s = null; try { s = JSON.parse(r.summary_json) } catch(e){}
+      return {
+        id: r.id, title: r.title,
+        period_start: r.period_start, period_end: r.period_end,
+        report_count: r.report_count,
+        doc_url: r.doc_url, pdf_url: r.pdf_url,
+        summary: s, created_at: r.created_at,
+      }
+    })
+}
+
+function generateWeeklyReport() {
+  var now     = new Date()
+  var weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+  var allReports  = readSheet(getSheet(SHEETS.REPORTS))
+  var weekReports = allReports.filter(function(r){
+    return r.created_at && new Date(r.created_at) >= weekAgo
+  })
+
+  var stats    = _weeklyStats(allReports, weekReports)
+  var aiResult = _weeklyAISummary(weekReports, stats)
+
+  var folder  = getOrCreateFolder('weekly-reports')
+  var dateStr = Utilities.formatDate(now, 'Asia/Kathmandu', 'yyyy-MM-dd')
+  var title   = 'नागरिक आवाज Weekly Report — ' + dateStr
+  var doc     = DocumentApp.create(title)
+  var body    = doc.getBody()
+
+  _buildWeeklyDoc(body, weekReports, allReports, stats, aiResult, weekAgo, now)
+  doc.saveAndClose()
+
+  var docFile = DriveApp.getFileById(doc.getId())
+  docFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW)
+  folder.addFile(docFile)
+  try { DriveApp.getRootFolder().removeFile(docFile) } catch(e) {}
+
+  var pdfBlob = docFile.getAs('application/pdf')
+  pdfBlob.setName(title + '.pdf')
+  var pdfFile = folder.createFile(pdfBlob)
+  pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW)
+
+  var id  = uuid()
+  var now2 = new Date().toISOString()
+  getSheet(SHEETS.WEEKLY).appendRow([
+    id, title,
+    weekAgo.toISOString(), now.toISOString(),
+    weekReports.length,
+    docFile.getUrl(), pdfFile.getUrl(),
+    JSON.stringify(aiResult),
+    now2,
+  ])
+
+  Logger.log('Weekly report done: ' + docFile.getUrl())
+  return { id: id, docUrl: docFile.getUrl(), pdfUrl: pdfFile.getUrl(), reportCount: weekReports.length }
+}
+
+function _weeklyStats(all, week) {
+  var catCount = {}, provCount = {}, sevCount = {}
+  week.forEach(function(r){
+    catCount[r.category]  = (catCount[r.category]  || 0) + 1
+    provCount[r.province] = (provCount[r.province] || 0) + 1
+    sevCount[r.severity]  = (sevCount[r.severity]  || 0) + 1
+  })
+  var open     = all.filter(function(r){ return !['samaadhaan','banda'].includes(r.status) })
+  var resolved = all.filter(function(r){ return r.status === 'samaadhaan' })
+  var critical = all.filter(function(r){ return r.severity === 'critical' && !['samaadhaan','banda'].includes(r.status) })
+
+  var topPriority = week.slice().sort(function(a,b){
+    return (Number(b.priority_score)||0) - (Number(a.priority_score)||0)
+  }).slice(0, 10)
+
+  return {
+    totalAll: all.length, totalWeek: week.length,
+    open: open.length, resolved: resolved.length, critical: critical.length,
+    catCount: catCount, provCount: provCount, sevCount: sevCount,
+    topPriority: topPriority,
+    withPhotos: week.filter(function(r){ return r.photo_ids }).length,
+  }
+}
+
+function _weeklyAISummary(weekReports, stats) {
+  if (!GEMINI_KEY) return { executive_summary: 'AI summary unavailable (no API key).', recommendations: [] }
+  var issues = weekReports.slice(0, 80).map(function(r){ return {
+    title: r.title_en || r.title_np, category: r.category, severity: r.severity,
+    status: r.status, province: r.province, district: r.district, palika: r.palika,
+    upvotes: r.upvotes, priority_score: r.priority_score,
+  }})
+  var prompt =
+    'You are a municipal analyst for Nepal. Summarize this week\'s ' + weekReports.length + ' citizen-reported issues.\n' +
+    'Stats: open=' + stats.open + ' resolved=' + stats.resolved + ' critical=' + stats.critical + '\n' +
+    'Top categories: ' + JSON.stringify(stats.catCount) + '\n' +
+    'Issues: ' + JSON.stringify(issues) + '\n\n' +
+    'Return ONLY valid JSON:\n' +
+    '{"executive_summary":"2-3 sentence bilingual summary (English | नेपाली)","key_findings":["finding1","finding2","finding3"],' +
+    '"hotspots":["area1","area2"],"recommendations":["action1","action2","action3"],' +
+    '"trend":"improving/worsening/stable with brief reason"}'
+  try {
+    var text   = callGemini(prompt, 800)
+    var parsed = JSON.parse(text.replace(/```json|```/g,'').trim())
+    return parsed
+  } catch(e) {
+    return { executive_summary: 'Summary generation failed: ' + e.message, recommendations: [] }
+  }
+}
+
+function _buildWeeklyDoc(body, week, all, stats, ai, weekAgo, now) {
+  var fmt = function(d){ return Utilities.formatDate(d, 'Asia/Kathmandu', 'MMM dd, yyyy') }
+
+  // ── Title ──
+  var title = body.appendParagraph('नागरिक आवाज | NagarikAwaz')
+  title.setHeading(DocumentApp.ParagraphHeading.HEADING1)
+  title.setAlignment(DocumentApp.HorizontalAlignment.CENTER)
+  body.appendParagraph('साप्ताहिक प्रतिवेदन / Weekly Report')
+    .setHeading(DocumentApp.ParagraphHeading.HEADING2)
+    .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
+  body.appendParagraph(fmt(weekAgo) + ' — ' + fmt(now))
+    .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
+    .setItalic(true)
+  body.appendHorizontalRule()
+
+  // ── Quick stats ──
+  body.appendParagraph('📊 Weekly Snapshot').setHeading(DocumentApp.ParagraphHeading.HEADING2)
+  var statTable = body.appendTable([
+    ['Metric', 'Value'],
+    ['New reports this week', String(stats.totalWeek)],
+    ['Total reports (all time)', String(stats.totalAll)],
+    ['Currently open', String(stats.open)],
+    ['Resolved (all time)', String(stats.resolved)],
+    ['Critical & open', String(stats.critical)],
+    ['Reports with photos', String(stats.withPhotos)],
+  ])
+  statTable.getRow(0).editAsText().setBold(true)
+  statTable.setBorderWidth(1)
+
+  // ── Map ──
+  body.appendParagraph('').appendHorizontalRule()
+  body.appendParagraph('🗺️ Issue Locations This Week').setHeading(DocumentApp.ParagraphHeading.HEADING2)
+  var mapReports = week.filter(function(r){ return r.lat && r.lng })
+  if (mapReports.length > 0) {
+    try {
+      var sm = Maps.newStaticMap().setSize(600, 320).setZoom(7).setCenter(28.3949, 84.124)
+      mapReports.slice(0, 50).forEach(function(r){
+        sm.addMarker(parseFloat(r.lat), parseFloat(r.lng))
+      })
+      body.appendImage(Utilities.newBlob(sm.getMapImage(), 'image/png', 'map.png')).setWidth(500)
+    } catch(e) {
+      body.appendParagraph('Map could not be generated automatically. View live map: ' + SITE_URL)
+        .setItalic(true).setLinkUrl(SITE_URL)
+    }
+  } else {
+    body.appendParagraph('No geo-coded reports this week.').setItalic(true)
+  }
+
+  // ── AI Summary ──
+  body.appendParagraph('').appendHorizontalRule()
+  body.appendParagraph('🤖 AI Executive Summary').setHeading(DocumentApp.ParagraphHeading.HEADING2)
+  body.appendParagraph(ai.executive_summary || 'No summary available.')
+  if (ai.key_findings && ai.key_findings.length) {
+    body.appendParagraph('Key Findings:').setBold(true)
+    ai.key_findings.forEach(function(f){ body.appendListItem(f).setGlyphType(DocumentApp.GlyphType.BULLET) })
+  }
+  if (ai.trend) {
+    body.appendParagraph('Trend: ' + ai.trend).setItalic(true)
+  }
+
+  // ── Photo gallery ──
+  var photoReports = week.filter(function(r){ return r.photo_ids && r.photo_ids.trim() })
+  if (photoReports.length > 0) {
+    body.appendParagraph('').appendHorizontalRule()
+    body.appendParagraph('📸 Photo Evidence').setHeading(DocumentApp.ParagraphHeading.HEADING2)
+    var photoCount = 0
+    photoReports.forEach(function(r){
+      if (photoCount >= 6) return
+      var ids = r.photo_ids.split(',').filter(Boolean)
+      ids.forEach(function(fid){
+        if (photoCount >= 6) return
+        try {
+          var file = DriveApp.getFileById(fid.trim())
+          var blob = file.getBlob().setName(fid + '.jpg')
+          var img = body.appendImage(blob)
+          img.setWidth(200)
+          body.appendParagraph((r.title_en || r.title_np || '') + ' — ' + (r.palika || '') + ', W-' + (r.ward_no || ''))
+            .setItalic(true).setFontSize(9)
+          photoCount++
+        } catch(e) {
+          Logger.log('Photo embed failed for ' + fid + ': ' + e.message)
+        }
+      })
+    })
+  }
+
+  // ── Category breakdown ──
+  body.appendParagraph('').appendHorizontalRule()
+  body.appendParagraph('📂 Category Breakdown').setHeading(DocumentApp.ParagraphHeading.HEADING2)
+  var catRows = [['Category', 'Count']]
+  Object.keys(stats.catCount).sort(function(a,b){ return stats.catCount[b] - stats.catCount[a] }).forEach(function(c){
+    catRows.push([c, String(stats.catCount[c])])
+  })
+  if (catRows.length > 1) {
+    var catTable = body.appendTable(catRows)
+    catTable.getRow(0).editAsText().setBold(true)
+    catTable.setBorderWidth(1)
+  }
+
+  // ── Province breakdown ──
+  body.appendParagraph('').appendHorizontalRule()
+  body.appendParagraph('🗾 Province Breakdown').setHeading(DocumentApp.ParagraphHeading.HEADING2)
+  var provRows = [['Province', 'New This Week']]
+  Object.keys(stats.provCount).sort(function(a,b){ return stats.provCount[b] - stats.provCount[a] }).forEach(function(p){
+    provRows.push([p || 'Unknown', String(stats.provCount[p])])
+  })
+  if (provRows.length > 1) {
+    var provTable = body.appendTable(provRows)
+    provTable.getRow(0).editAsText().setBold(true)
+    provTable.setBorderWidth(1)
+  }
+
+  // ── Top priority issues ──
+  body.appendParagraph('').appendHorizontalRule()
+  body.appendParagraph('🔴 Top Priority Issues').setHeading(DocumentApp.ParagraphHeading.HEADING2)
+  if (stats.topPriority.length > 0) {
+    var priRows = [['#', 'Title', 'Category', 'Severity', 'Location', 'Score', 'Upvotes']]
+    stats.topPriority.forEach(function(r, i){
+      priRows.push([
+        String(i+1),
+        (r.title_en || r.title_np || '').slice(0, 50),
+        r.category || '', r.severity || '',
+        [r.palika, r.district].filter(Boolean).join(', ') || r.province || '',
+        String(r.priority_score || 0), String(r.upvotes || 0),
+      ])
+    })
+    var priTable = body.appendTable(priRows)
+    priTable.getRow(0).editAsText().setBold(true)
+    priTable.setBorderWidth(1)
+  }
+
+  // ── Recommendations ──
+  if (ai.recommendations && ai.recommendations.length) {
+    body.appendParagraph('').appendHorizontalRule()
+    body.appendParagraph('✅ Recommended Actions').setHeading(DocumentApp.ParagraphHeading.HEADING2)
+    ai.recommendations.forEach(function(a){ body.appendListItem(a).setGlyphType(DocumentApp.GlyphType.NUMBER) })
+  }
+  if (ai.hotspots && ai.hotspots.length) {
+    body.appendParagraph('⚠️ Hotspot Areas: ' + ai.hotspots.join(', ')).setBold(true)
+  }
+
+  // ── Footer ──
+  body.appendParagraph('').appendHorizontalRule()
+  body.appendParagraph('Generated by NagarikAwaz on ' + fmt(now) + ' | ' + SITE_URL)
+    .setItalic(true).setFontSize(9)
+    .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
+}
+
+// Call once to create the Monday 9AM trigger.
+function setupWeeklyTrigger() {
+  // Remove existing weekly triggers first
+  ScriptApp.getProjectTriggers().forEach(function(t){
+    if (t.getHandlerFunction() === 'generateWeeklyReport') ScriptApp.deleteTrigger(t)
+  })
+  ScriptApp.newTrigger('generateWeeklyReport')
+    .timeBased()
+    .everyWeeks(1)
+    .onWeekDay(ScriptApp.WeekDay.MONDAY)
+    .atHour(9)
+    .inTimezone('Asia/Kathmandu')
+    .create()
+  Logger.log('Weekly trigger created — runs every Monday at 9 AM Kathmandu time.')
 }
 
 // =============================================================================

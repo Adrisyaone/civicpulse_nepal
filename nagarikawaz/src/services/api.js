@@ -57,6 +57,11 @@ export const aiApi = {
   list:     ()     => q('listAIReports'),
 }
 
+// ── Weekly Reports ────────────────────────────────────────────────────────────
+export const weeklyApi = {
+  list: () => q('getWeeklyReports'),
+}
+
 // ── Photo upload via Netlify proxy → Google Drive ────────────────────────────
 // Direct GAS POST fails in browsers (302 redirect strips body + CORS).
 // The Netlify function at /.netlify/functions/upload-photo proxies server-side.

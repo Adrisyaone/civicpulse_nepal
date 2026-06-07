@@ -9,6 +9,7 @@ const UI = {
   report:        { ne: 'रिपोर्ट',                   en: 'Report'                },
   dashboard:     { ne: 'ड्यासबोर्ड',               en: 'Dashboard'             },
   aiReports:     { ne: 'AI रिपोर्ट',               en: 'AI Reports'            },
+  weeklySummary: { ne: 'साप्ताहिक',                 en: 'Weekly'                },
   admin:         { ne: 'प्रशासन',                   en: 'Admin'                 },
   signIn:        { ne: 'लग इन',                     en: 'Sign In'               },
   signOut:       { ne: 'लग आउट',                    en: 'Sign Out'              },

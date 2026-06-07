@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet.markercluster'
 import { useNavigate } from 'react-router-dom'
-import { useReports, useGeolocation, useUpvoteReport } from '../../hooks'
+import { useReports, useGeolocation, useUpvoteReport, getLocalUpvoted } from '../../hooks'
 import { createMarkerIcon, timeAgo, cn } from '../../utils/helpers'
 import { CATEGORIES, MAP_DEFAULTS } from '../../utils/constants'
 import { CategoryBadge, SeverityBadge, StatusBadge, Spinner } from '../ui'
@@ -19,7 +19,7 @@ export default function MapView({ filters = {} }) {
   const [selected,    setSelected]    = useState(null)
   const [mapType,     setMapType]     = useState('osm')
   const [showBounds,  setShowBounds]  = useState(false)
-  const [upvotedIds,  setUpvotedIds]  = useState(new Set())
+  const [upvotedIds,  setUpvotedIds]  = useState(() => getLocalUpvoted())
   const boundsRef = useRef(null)
   const upvote = useUpvoteReport()
 
@@ -194,19 +194,20 @@ export default function MapView({ filters = {} }) {
               <span className="text-xs text-slate-600">{timeAgo(selected.created_at)}</span>
               <div className="flex items-center gap-3">
                 <button
-                  disabled={upvote.isPending || upvotedIds.has(selected.id)}
+                  disabled={upvote.isPending || upvotedIds.has(String(selected.id))}
                   onClick={(e) => {
                     e.stopPropagation()
                     upvote.mutate(selected.id, {
-                      onSuccess: () => {
-                        setUpvotedIds((s) => new Set([...s, selected.id]))
+                      onSuccess: (data) => {
+                        if (data?.alreadyVoted) return
+                        setUpvotedIds((s) => new Set([...s, String(selected.id)]))
                         setSelected((r) => ({ ...r, upvotes: String((Number(r.upvotes) || 0) + 1) }))
                       },
                     })
                   }}
                   className={cn(
                     'text-xs px-2 py-1 rounded-full border transition-all',
-                    upvotedIds.has(selected.id)
+                    upvotedIds.has(String(selected.id))
                       ? 'border-brand-700 text-brand-400 bg-brand-900/30 cursor-default'
                       : 'border-slate-700 text-slate-400 hover:border-brand-600 hover:text-brand-400'
                   )}>

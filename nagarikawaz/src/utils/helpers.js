@@ -29,12 +29,21 @@ export function haversine(lat1, lng1, lat2, lng2) {
 export function createMarkerIcon(category, severity) {
   const cat = CATEGORIES[category] || CATEGORIES.other
   const sev = SEVERITIES[severity] || SEVERITIES.medium
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="38" viewBox="0 0 28 38">
-    <path d="M14 0C6.268 0 0 6.268 0 14c0 8.75 14 24 14 24s14-15.25 14-24C28 6.268 21.732 0 14 0z" fill="${cat.color}" opacity=".92"/>
-    <circle cx="14" cy="14" r="6.5" fill="white" opacity=".92"/>
-    <circle cx="14" cy="14" r="4" fill="${sev.color}" opacity=".88"/>
-  </svg>`
-  return L.divIcon({ html: svg, className: '', iconSize: [28,38], iconAnchor: [14,38], popupAnchor: [0,-40] })
+  // severity ring: critical = thick red border, high = orange, medium = none, low = none
+  const ring = severity === 'critical'
+    ? `<circle cx="16" cy="16" r="14.5" fill="none" stroke="${sev.color}" stroke-width="2.5" opacity=".9"/>`
+    : severity === 'high'
+    ? `<circle cx="16" cy="16" r="14.5" fill="none" stroke="${sev.color}" stroke-width="1.5" opacity=".7"/>`
+    : ''
+  const html = `<div style="position:relative;width:36px;height:46px;filter:drop-shadow(0 2px 5px rgba(0,0,0,.45))">
+    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">
+      <path d="M18 0C8.059 0 0 8.059 0 18c0 11.25 18 28 18 28S36 29.25 36 18C36 8.059 27.941 0 18 0z" fill="${cat.color}" opacity=".93"/>
+      <circle cx="18" cy="18" r="11" fill="rgba(255,255,255,0.93)"/>
+      ${ring}
+    </svg>
+    <span style="position:absolute;top:7px;left:0;right:0;text-align:center;font-size:13px;line-height:1;pointer-events:none">${cat.icon}</span>
+  </div>`
+  return L.divIcon({ html, className: '', iconSize: [36,46], iconAnchor: [18,46], popupAnchor: [0,-48] })
 }
 
 export function statusToProgress(status) {

@@ -51,14 +51,29 @@ export function useUpdateReport() {
   })
 }
 
+const LS_KEY = 'nw_upvoted'
+function getVotedSet() {
+  try { return new Set(JSON.parse(localStorage.getItem(LS_KEY) || '[]')) } catch { return new Set() }
+}
+function saveVotedSet(s) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify([...s])) } catch {}
+}
+export function getLocalUpvoted() { return getVotedSet() }
+
 export function useUpvoteReport() {
   const qc = useQueryClient()
   const { user } = useAuth()
   return useMutation({
-    mutationFn: (id) => reportsApi.upvote(id, user?.id),
-    onSuccess:  (_, id) => {
+    mutationFn: (id) => {
+      if (getVotedSet().has(String(id))) return Promise.resolve({ ok: true, alreadyVoted: true })
+      return reportsApi.upvote(id, user?.id)
+    },
+    onSuccess: (data, id) => {
+      if (data?.alreadyVoted) { toast('Already voted on this device 👍', { icon: 'ℹ️' }); return }
+      const s = getVotedSet(); s.add(String(id)); saveVotedSet(s)
       qc.invalidateQueries({ queryKey: ['reports'] })
       qc.invalidateQueries({ queryKey: ['report', id] })
+      toast.success('Upvoted!')
     },
     onError: () => toast.error('Upvote failed'),
   })

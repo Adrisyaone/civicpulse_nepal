@@ -13,12 +13,13 @@ export default function Navbar() {
   const [menu,   setMenu] = useState(false)
 
   const links = [
-    { to: '/',           k: 'map',        icon: '🗺️', show: true       },
-    { to: '/feed',       k: 'feed',       icon: '📋', show: true       },
-    { to: '/report/new', k: 'report',     icon: '➕', show: true       },
-    { to: '/dashboard',  k: 'dashboard',  icon: '📊', show: isOfficer  },
-    { to: '/ai-reports', k: 'aiReports',  icon: '✨', show: isLead     },
-    { to: '/admin',      k: 'admin',      icon: '⚙️', show: isAdmin    },
+    { to: '/',                k: 'map',           icon: '🗺️', show: true       },
+    { to: '/feed',            k: 'feed',          icon: '📋', show: true       },
+    { to: '/weekly-reports',  k: 'weeklySummary', icon: '📊', show: true       },
+    { to: '/report/new',      k: 'report',        icon: '➕', show: true       },
+    { to: '/dashboard',       k: 'dashboard',     icon: '📈', show: isOfficer  },
+    { to: '/ai-reports',      k: 'aiReports',     icon: '✨', show: isLead     },
+    { to: '/admin',           k: 'admin',         icon: '⚙️', show: isAdmin    },
   ].filter((l) => l.show)
 
   const active = (to) => to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(to)
