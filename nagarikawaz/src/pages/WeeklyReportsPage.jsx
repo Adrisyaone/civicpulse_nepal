@@ -1,17 +1,45 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { weeklyApi } from '../services/api'
 import { useLang } from '../context/LangContext'
 import { Spinner, EmptyState } from '../components/ui'
 import { formatDate } from '../utils/helpers'
 
+const SCHEDULE_KEY = 'weekly_report_schedule'
+const DAY_LABELS = {
+  SUNDAY: { en: 'Sunday', ne: 'आइतबार' },
+  MONDAY: { en: 'Monday', ne: 'सोमबार' },
+  TUESDAY: { en: 'Tuesday', ne: 'मंगलबार' },
+  WEDNESDAY: { en: 'Wednesday', ne: 'बुधबार' },
+  THURSDAY: { en: 'Thursday', ne: 'बिहिबार' },
+  FRIDAY: { en: 'Friday', ne: 'शुक्रबार' },
+  SATURDAY: { en: 'Saturday', ne: 'शनिबार' },
+}
+
+function fmtHour(h) {
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  return `${h % 12 || 12}:00 ${ampm}`
+}
+
+function getSchedule() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SCHEDULE_KEY) || '{}')
+    return { day: s.day || 'SUNDAY', hour: s.hour ?? 17 }
+  } catch { return { day: 'SUNDAY', hour: 17 } }
+}
+
 export default function WeeklyReportsPage() {
   const { lang } = useLang()
+  const navigate = useNavigate()
   const { data: reports, isLoading } = useQuery({
     queryKey: ['weekly-reports'],
     queryFn:  weeklyApi.list,
     staleTime: 300000,
   })
+
+  const schedule = getSchedule()
+  const dayLabel = DAY_LABELS[schedule.day] || DAY_LABELS.SUNDAY
 
   if (isLoading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -24,14 +52,24 @@ export default function WeeklyReportsPage() {
   return (
     <div className="page-wrap">
       <div className="mb-6">
-        <h1 className="font-display font-bold text-2xl text-white flex items-center gap-2">
-          📊 {lang === 'ne' ? 'साप्ताहिक प्रतिवेदन' : 'Weekly Summary Reports'}
-        </h1>
-        <p className="text-slate-500 text-sm mt-1">
-          {lang === 'ne'
-            ? 'प्रत्येक सोमबार स्वतः निर्मित व्यापक प्रतिवेदन'
-            : 'Auto-generated every Monday — comprehensive analysis with maps, photos & AI insights'}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="font-display font-bold text-2xl text-white flex items-center gap-2">
+              📊 {lang === 'ne' ? 'साप्ताहिक प्रतिवेदन' : 'Weekly Summary Reports'}
+            </h1>
+            <p className="text-slate-500 text-sm mt-1">
+              {lang === 'ne'
+                ? `प्रत्येक ${dayLabel.ne} ${fmtHour(schedule.hour)} मा स्वतः निर्मित व्यापक प्रतिवेदन`
+                : `Auto-generated every ${dayLabel.en} at ${fmtHour(schedule.hour)} — comprehensive analysis with maps, photos & AI insights`}
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/settings#weekly-schedule')}
+            className="btn-ghost py-1.5 px-3 text-xs flex items-center gap-1.5 shrink-0 mt-1"
+          >
+            ⚙️ {lang === 'ne' ? 'तालिका' : 'Schedule'}
+          </button>
+        </div>
       </div>
 
       {list.length === 0 ? (
@@ -39,8 +77,8 @@ export default function WeeklyReportsPage() {
           icon="📄"
           title={lang === 'ne' ? 'अहिलेसम्म कुनै प्रतिवेदन छैन' : 'No reports yet'}
           description={lang === 'ne'
-            ? 'पहिलो साप्ताहिक प्रतिवेदन आउँदो सोमबार निर्मित हुनेछ।'
-            : 'The first weekly report will be generated next Monday. Admins can also trigger it manually from the Apps Script editor.'}
+            ? `पहिलो साप्ताहिक प्रतिवेदन आउँदो ${dayLabel.ne} निर्मित हुनेछ।`
+            : `The first weekly report will be generated next ${dayLabel.en}. Admins can also trigger it manually from the Apps Script editor.`}
         />
       ) : (
         <div className="space-y-4">
@@ -53,8 +91,8 @@ export default function WeeklyReportsPage() {
       <div className="mt-8 card p-4 text-sm text-slate-500 space-y-1">
         <p className="font-medium text-slate-400">ℹ️ {lang === 'ne' ? 'कसरी काम गर्छ?' : 'How it works'}</p>
         <p>{lang === 'ne'
-          ? 'प्रत्येक सोमबार बिहान ९ बजे Google Apps Script ले सबै रिपोर्टहरूको विश्लेषण गर्छ, नक्शा र तस्वीर सहित PDF बनाउँछ।'
-          : 'Every Monday at 9 AM Nepal time, Google Apps Script analyses all reports, generates a comprehensive Google Doc with maps & photos, exports it as PDF, and makes it publicly accessible.'
+          ? `प्रत्येक ${dayLabel.ne} ${fmtHour(schedule.hour)} बजे Google Apps Script ले सबै रिपोर्टहरूको विश्लेषण गर्छ, नक्शा र तस्वीर सहित PDF बनाउँछ।`
+          : `Every ${dayLabel.en} at ${fmtHour(schedule.hour)} Nepal time, Google Apps Script analyses all reports, generates a comprehensive Google Doc with maps & photos, exports it as PDF, and makes it publicly accessible.`
         }</p>
       </div>
     </div>

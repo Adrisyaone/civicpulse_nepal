@@ -59,7 +59,8 @@ export const aiApi = {
 
 // ── Weekly Reports ────────────────────────────────────────────────────────────
 export const weeklyApi = {
-  list: () => q('getWeeklyReports'),
+  list:           ()           => q('getWeeklyReports'),
+  updateSchedule: (day, hour)  => q('updateWeeklySchedule', { day, hour }),
 }
 
 // ── Photo upload via Netlify proxy → Google Drive ────────────────────────────

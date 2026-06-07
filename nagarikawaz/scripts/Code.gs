@@ -63,8 +63,9 @@ function doGet(e) {
       case 'listAIReports':      result = listAIReports();         break
       case 'prioritizeReport':   result = prioritizeReport(p.id); break
       // Weekly reports
-      case 'getWeeklyReports':    result = getWeeklyReports();          break
-      case 'triggerWeeklyReport': result = generateWeeklyReport();      break
+      case 'getWeeklyReports':     result = getWeeklyReports();                break
+      case 'triggerWeeklyReport':  result = generateWeeklyReport();            break
+      case 'updateWeeklySchedule': result = updateWeeklySchedule(p);          break
       // Drive
       case 'uploadPhoto':        result = uploadPhoto(p);          break
       // Health
@@ -888,20 +889,46 @@ function _buildWeeklyDoc(body, week, all, stats, ai, weekAgo, now) {
     .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
 }
 
-// Call once to create the Monday 9AM trigger.
+// Call once to create the trigger (default: Sunday 5 PM Kathmandu time).
 function setupWeeklyTrigger() {
-  // Remove existing weekly triggers first
   ScriptApp.getProjectTriggers().forEach(function(t){
     if (t.getHandlerFunction() === 'generateWeeklyReport') ScriptApp.deleteTrigger(t)
   })
   ScriptApp.newTrigger('generateWeeklyReport')
     .timeBased()
     .everyWeeks(1)
-    .onWeekDay(ScriptApp.WeekDay.MONDAY)
-    .atHour(9)
+    .onWeekDay(ScriptApp.WeekDay.SUNDAY)
+    .atHour(17)
     .inTimezone('Asia/Kathmandu')
     .create()
-  Logger.log('Weekly trigger created — runs every Monday at 9 AM Kathmandu time.')
+  Logger.log('Weekly trigger created — runs every Sunday at 5 PM Kathmandu time.')
+}
+
+// Update trigger day/hour via frontend Settings → saved to localStorage + called here.
+function updateWeeklySchedule(p) {
+  var dayMap = {
+    SUNDAY:    ScriptApp.WeekDay.SUNDAY,
+    MONDAY:    ScriptApp.WeekDay.MONDAY,
+    TUESDAY:   ScriptApp.WeekDay.TUESDAY,
+    WEDNESDAY: ScriptApp.WeekDay.WEDNESDAY,
+    THURSDAY:  ScriptApp.WeekDay.THURSDAY,
+    FRIDAY:    ScriptApp.WeekDay.FRIDAY,
+    SATURDAY:  ScriptApp.WeekDay.SATURDAY,
+  }
+  var weekDay = dayMap[String(p.day || '').toUpperCase()] || ScriptApp.WeekDay.SUNDAY
+  var hour    = Math.max(0, Math.min(23, parseInt(p.hour, 10) || 17))
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'generateWeeklyReport') ScriptApp.deleteTrigger(t)
+  })
+  ScriptApp.newTrigger('generateWeeklyReport')
+    .timeBased()
+    .everyWeeks(1)
+    .onWeekDay(weekDay)
+    .atHour(hour)
+    .inTimezone('Asia/Kathmandu')
+    .create()
+  Logger.log('Weekly trigger updated: ' + p.day + ' at ' + hour + ':00 Kathmandu time.')
+  return { ok: true, day: p.day, hour: hour }
 }
 
 // =============================================================================
