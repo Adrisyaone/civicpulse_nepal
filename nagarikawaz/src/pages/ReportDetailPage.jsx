@@ -26,10 +26,10 @@ export default function ReportDetailPage() {
   const update  = useUpdateReport()
   const upvote  = useUpvoteReport()
 
-  const [tab,          setTab]    = useState('timeline')
-  const [aModal,       setAModal] = useState(false)
-  const [alreadyVoted, setVoted]  = useState(false)
-  // Sync voted state once report id is known
+  const [tab,          setTab]       = useState('timeline')
+  const [aModal,       setAModal]    = useState(false)
+  const [alreadyVoted, setVoted]     = useState(false)
+  const [localUpvotes, setLocalUpvotes] = useState(null)
   React.useEffect(() => { if (r?.id) setVoted(getLocalUpvoted().has(String(r.id))) }, [r?.id])
   const [aForm,   setAForm]  = useState({ department: '', status: '' })
   const [lbox,    setLbox]   = useState(null)
@@ -147,13 +147,18 @@ export default function ReportDetailPage() {
           <div className="card p-4">
             <h3 className="section-title mb-3">{tr('engagement')}</h3>
             <div className="flex justify-around text-center">
-              <div><div className="font-display font-bold text-2xl text-white">{r.upvotes || 0}</div><div className="text-xs text-slate-500">{tr('upvote')}</div></div>
+              <div><div className="font-display font-bold text-2xl text-white">{localUpvotes ?? r.upvotes ?? 0}</div><div className="text-xs text-slate-500">{tr('upvote')}</div></div>
               <div className="w-px bg-slate-800" />
               <div><div className="font-display font-bold text-2xl text-white">{r.comments_count || 0}</div><div className="text-xs text-slate-500">{tr('comment')}</div></div>
             </div>
             <button
-              onClick={() => upvote.mutate(r.id, { onSuccess: (d) => { if (!d?.alreadyVoted) setVoted(true) } })}
-              disabled={upvote.isPending || alreadyVoted}
+              onClick={() => {
+                if (alreadyVoted) return
+                setVoted(true)
+                setLocalUpvotes((localUpvotes ?? Number(r.upvotes || 0)) + 1)
+                upvote.mutate(r.id)
+              }}
+              disabled={alreadyVoted}
               className={cn('w-full justify-center mt-3 text-sm', alreadyVoted ? 'btn-ghost opacity-50 cursor-default' : 'btn-ghost')}>
               👍 {alreadyVoted ? (lang === 'ne' ? 'मत दिइसक्यो' : 'Already voted') : (lang === 'ne' ? 'समर्थन गर्नुहोस्' : 'Upvote')}
             </button>

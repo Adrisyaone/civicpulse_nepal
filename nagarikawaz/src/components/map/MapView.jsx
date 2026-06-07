@@ -249,16 +249,13 @@ export default function MapView({ filters = {} }) {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  disabled={upvote.isPending || upvotedIds.has(String(selected.id))}
+                  disabled={upvotedIds.has(String(selected.id))}
                   onClick={(e) => {
                     e.stopPropagation()
-                    upvote.mutate(selected.id, {
-                      onSuccess: (data) => {
-                        if (data?.alreadyVoted) return
-                        setUpvotedIds((s) => new Set([...s, String(selected.id)]))
-                        setSelected((r) => ({ ...r, upvotes: String((Number(r.upvotes) || 0) + 1) }))
-                      },
-                    })
+                    if (upvotedIds.has(String(selected.id))) return
+                    setUpvotedIds((s) => new Set([...s, String(selected.id)]))
+                    setSelected((r) => ({ ...r, upvotes: String((Number(r.upvotes) || 0) + 1) }))
+                    upvote.mutate(selected.id)
                   }}
                   className={cn(
                     'text-xs px-2.5 py-1 rounded-full border transition-all flex items-center gap-1',
