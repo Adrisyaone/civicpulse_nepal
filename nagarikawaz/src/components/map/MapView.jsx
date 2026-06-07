@@ -116,8 +116,8 @@ export default function MapView({ filters = {} }) {
         </div>
       )}
 
-      {/* Issue count bubble */}
-      <div className="absolute top-4 left-4 glass rounded-xl px-3 py-2 pointer-events-none" style={{ zIndex: 800 }}>
+      {/* Issue count bubble — bottom-left, away from markers */}
+      <div className="absolute bottom-28 left-3 glass rounded-xl px-3 py-2 pointer-events-none" style={{ zIndex: 800 }}>
         <div className="font-mono text-brand-400 font-bold text-lg leading-none">{reports?.length ?? 0}</div>
         <div className="text-xs text-slate-500">{lang === 'ne' ? 'रिपोर्ट' : 'issues'}</div>
       </div>
@@ -169,8 +169,8 @@ export default function MapView({ filters = {} }) {
         </div>
       </div>
 
-      {/* Category legend (desktop) */}
-      <div className="absolute bottom-24 left-3 glass rounded-xl p-3 hidden lg:block" style={{ zIndex: 800 }}>
+      {/* Category legend (desktop only, above count bubble) */}
+      <div className="absolute bottom-44 left-3 glass rounded-xl p-3 hidden lg:block" style={{ zIndex: 800 }}>
         <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Category</p>
         {Object.entries(CATEGORIES).slice(0, 7).map(([k, v]) => (
           <div key={k} className="flex items-center gap-1.5 mb-1">
