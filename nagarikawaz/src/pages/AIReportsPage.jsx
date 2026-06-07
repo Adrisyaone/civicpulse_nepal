@@ -3,7 +3,8 @@ import { useGenerateAIReport, useAIReports } from '../hooks'
 import { useAuth } from '../context/AuthContext'
 import { useLang } from '../context/LangContext'
 import { Spinner, EmptyState } from '../components/ui'
-import { PROVINCES, DISTRICTS_BY_PROVINCE } from '../utils/constants'
+import { PROVINCES } from '../utils/constants'
+import { NEPAL_GEO } from '../utils/nepalGeo'
 import { formatDate } from '../utils/helpers'
 
 export default function AIReportsPage() {
@@ -45,7 +46,7 @@ export default function AIReportsPage() {
             <label className="label">{tr('district')}</label>
             <select value={district} onChange={(e)=>{setDistrict(e.target.value);setPalika('')}} className="input text-sm" disabled={!province}>
               <option value="">{lang==='ne'?'सबै जिल्ला':'All Districts'}</option>
-              {(DISTRICTS_BY_PROVINCE[provinceObj?.id]||[]).map((d)=><option key={d} value={d}>{d}</option>)}
+              {Object.keys(NEPAL_GEO[provinceObj?.id]||{}).map((d)=><option key={d} value={d}>{d}</option>)}
             </select>
           </div>
           <div>
