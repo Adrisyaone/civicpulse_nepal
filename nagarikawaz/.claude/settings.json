@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(python --version)",
+      "PowerShell(python -c \"import geopandas; print\\('geopandas ok'\\)\" 2>&1)",
+      "PowerShell(python -c \"import fiona; print\\('fiona ok'\\)\" 2>&1)",
+      "PowerShell(python -c \"import dbfread; print\\('dbfread ok'\\)\" 2>&1)",
+      "PowerShell(python -c \"import shapefile; print\\('pyshp ok'\\)\" 2>&1)"
+    ]
+  }
+}
