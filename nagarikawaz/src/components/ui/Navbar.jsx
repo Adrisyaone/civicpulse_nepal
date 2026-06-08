@@ -10,23 +10,17 @@ export default function Navbar() {
   const { lang, toggleLang, tr } = useLang()
   const loc      = useLocation()
   const navigate = useNavigate()
-  const [menu,        setMenu]        = useState(false)
-  const [updatesOpen, setUpdatesOpen] = useState(false)
+  const [menu, setMenu] = useState(false)
 
   // Links that appear as flat items (desktop + mobile)
   const flatLinks = [
-    { to: '/',           k: 'map',       icon: '🗺️', show: true       },
-    { to: '/report/new', k: 'report',    icon: '➕', show: true       },
-    { to: '/dashboard',  k: 'dashboard', icon: '📈', show: isOfficer  },
-    { to: '/ai-reports', k: 'aiReports', icon: '✨', show: isLead     },
-    { to: '/admin',      k: 'admin',     icon: '⚙️', show: isAdmin    },
+    { to: '/',               k: 'map',           icon: '🗺️', show: true       },
+    { to: '/weekly-reports', k: 'weeklySummary', icon: '📊', show: true       },
+    { to: '/report/new',     k: 'report',        icon: '➕', show: true       },
+    { to: '/dashboard',      k: 'dashboard',     icon: '📈', show: isOfficer  },
+    { to: '/ai-reports',     k: 'aiReports',     icon: '✨', show: isLead     },
+    { to: '/admin',          k: 'admin',         icon: '⚙️', show: isAdmin    },
   ].filter((l) => l.show)
-
-  // Links inside the "Updates" dropdown (desktop) / flat tabs (mobile)
-  const updatesLinks = [
-    { to: '/feed',           icon: '📰', mobileK: 'news',          desktopLabel: lang === 'ne' ? 'समाचार'       : 'News'         },
-    { to: '/weekly-reports', icon: '📊', mobileK: 'weeklySummary', desktopLabel: lang === 'ne' ? 'नागरिक आवाज' : 'NagarikAwaz'  },
-  ]
 
   // All links for mobile bottom nav (flat)
   const mobileLinks = [
@@ -40,7 +34,6 @@ export default function Navbar() {
   ].filter((l) => l.show)
 
   const active = (to) => to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(to)
-  const updatesActive = active('/feed') || active('/weekly-reports')
 
   function NavLink({ to, icon, label }) {
     return (
@@ -80,43 +73,7 @@ export default function Navbar() {
 
         {/* Desktop links */}
         <div className="hidden md:flex items-center gap-0.5 flex-1 justify-center">
-          {/* Map */}
-          <NavLink to="/" icon="🗺️" label={tr('map')} />
-
-          {/* Updates dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setUpdatesOpen(!updatesOpen)}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all',
-                updatesActive
-                  ? 'bg-brand-600/20 text-brand-400 border border-brand-600/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-              )}>
-              🔔 {tr('updates')} <span className="text-[10px] ml-0.5 opacity-70">▾</span>
-            </button>
-
-            {updatesOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setUpdatesOpen(false)} />
-                <div className="absolute top-full left-0 mt-1.5 w-44 card py-1 shadow-xl z-50 animate-fade-in">
-                  {updatesLinks.map((l) => (
-                    <Link key={l.to} to={l.to}
-                      onClick={() => setUpdatesOpen(false)}
-                      className={cn(
-                        'flex items-center gap-2 px-4 py-2.5 text-sm transition-all',
-                        active(l.to) ? 'text-brand-400 bg-brand-900/30' : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                      )}>
-                      {l.icon} {l.desktopLabel}
-                    </Link>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Remaining flat links */}
-          {flatLinks.filter(l => l.to !== '/').map((l) => (
+          {flatLinks.map((l) => (
             <NavLink key={l.to} to={l.to} icon={l.icon} label={tr(l.k)} />
           ))}
         </div>
