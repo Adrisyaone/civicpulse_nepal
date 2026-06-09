@@ -197,13 +197,17 @@ export default function ReportDetailPage() {
                   </button>
                 ))}
               </div>
-              {isAdmin && (
-                <button onClick={handleDelete} disabled={deleting}
-                  className="w-full justify-center text-sm py-2 rounded-lg border border-red-700/40 text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50 flex items-center gap-2">
-                  {deleting ? <Spinner size="sm" /> : '🗑️'}
-                  {lang === 'ne' ? 'रिपोर्ट मेट्नुहोस्' : 'Delete Report'}
-                </button>
-              )}
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="card p-4">
+              <h3 className="section-title mb-2 text-red-400">⚠️ {lang === 'ne' ? 'एडमिन' : 'Admin'}</h3>
+              <button onClick={handleDelete} disabled={deleting}
+                className="w-full justify-center text-sm py-2 rounded-lg border border-red-700/40 text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50 flex items-center gap-2">
+                {deleting ? <Spinner size="sm" /> : '🗑️'}
+                {lang === 'ne' ? 'रिपोर्ट मेट्नुहोस्' : 'Delete Report'}
+              </button>
             </div>
           )}
 

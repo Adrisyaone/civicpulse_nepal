@@ -15,9 +15,9 @@ export default function Navbar() {
   // Links that appear as flat items (desktop + mobile)
   const flatLinks = [
     { to: '/',               k: 'map',           icon: '🗺️', show: true      },
+    { to: '/dashboard',      k: 'dashboard',     icon: '📈', show: true      },
     { to: '/weekly-reports', k: 'weeklySummary', icon: '📊', show: true      },
     { to: '/report/new',     k: 'report',        icon: '➕', show: true      },
-    { to: '/dashboard',      k: 'dashboard',     icon: '📈', show: true      },
     { to: '/ai-reports',     k: 'aiReports',     icon: '✨', show: isLead    },
     { to: '/admin',          k: 'admin',         icon: '⚙️', show: isAdmin   },
   ].filter((l) => l.show)
@@ -25,10 +25,10 @@ export default function Navbar() {
   // All links for mobile bottom nav (flat)
   const mobileLinks = [
     { to: '/',               k: 'map',          icon: '🗺️', show: true      },
-    { to: '/feed',           k: 'news',         icon: '📰', show: true      },
+    { to: '/dashboard',      k: 'dashboard',    icon: '📈', show: true      },
     { to: '/weekly-reports', k: 'weeklySummary',icon: '📊', show: true      },
     { to: '/report/new',     k: 'report',       icon: '➕', show: true      },
-    { to: '/dashboard',      k: 'dashboard',    icon: '📈', show: true      },
+    { to: '/feed',           k: 'news',         icon: '📰', show: true      },
     { to: '/ai-reports',     k: 'aiReports',    icon: '✨', show: isLead    },
     { to: '/admin',          k: 'admin',        icon: '⚙️', show: isAdmin   },
   ].filter((l) => l.show)
