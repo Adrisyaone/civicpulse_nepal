@@ -6,7 +6,7 @@ const UI = {
   appName:       { ne: 'नागरिक आवाज',              en: 'NagarikAwaz'           },
   map:           { ne: 'नक्सा',                     en: 'Map'                   },
   feed:          { ne: 'सूची',                      en: 'Feed'                  },
-  report:        { ne: 'रिपोर्ट',                   en: 'Report'                },
+  report:        { ne: 'रिपोर्ट गर्नुस्',             en: 'Report Now'            },
   dashboard:     { ne: 'ड्यासबोर्ड',               en: 'Dashboard'             },
   aiReports:     { ne: 'AI रिपोर्ट',               en: 'AI Reports'            },
   weeklySummary: { ne: 'साप्ताहिक रिपोर्ट',          en: 'Weekly Report'         },

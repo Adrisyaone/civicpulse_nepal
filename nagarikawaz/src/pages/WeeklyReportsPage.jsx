@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { weeklyApi } from '../services/api'
 import { useLang } from '../context/LangContext'
+import { useAuth } from '../context/AuthContext'
 import { Spinner, EmptyState } from '../components/ui'
 import { formatDate } from '../utils/helpers'
 
@@ -31,7 +32,12 @@ function getSchedule() {
 
 export default function WeeklyReportsPage() {
   const { lang } = useLang()
+  const { isAdmin, isLead } = useAuth()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [generating, setGenerating] = useState(false)
+  const [genError,   setGenError]   = useState(null)
+
   const { data: reports, isLoading } = useQuery({
     queryKey: ['weekly-reports'],
     queryFn:  weeklyApi.list,
@@ -40,6 +46,19 @@ export default function WeeklyReportsPage() {
 
   const schedule = getSchedule()
   const dayLabel = DAY_LABELS[schedule.day] || DAY_LABELS.SUNDAY
+
+  async function handleGenerate() {
+    setGenerating(true)
+    setGenError(null)
+    try {
+      await weeklyApi.generate()
+      await queryClient.invalidateQueries({ queryKey: ['weekly-reports'] })
+    } catch (err) {
+      setGenError(err?.message || 'Failed to generate report')
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   if (isLoading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -63,13 +82,28 @@ export default function WeeklyReportsPage() {
                 : `Auto-generated every ${dayLabel.en} at ${fmtHour(schedule.hour)} — comprehensive analysis with maps, photos & AI insights`}
             </p>
           </div>
-          <button
-            onClick={() => navigate('/settings#weekly-schedule')}
-            className="btn-ghost py-1.5 px-3 text-xs flex items-center gap-1.5 shrink-0 mt-1"
-          >
-            ⚙️ {lang === 'ne' ? 'तालिका' : 'Schedule'}
-          </button>
+          <div className="flex items-center gap-2 shrink-0 mt-1">
+            {(isAdmin || isLead) && (
+              <button
+                onClick={handleGenerate}
+                disabled={generating}
+                className="btn-nepal py-1.5 px-3 text-xs flex items-center gap-1.5 disabled:opacity-60"
+              >
+                {generating ? <Spinner size="sm" /> : '⚡'}
+                {lang === 'ne' ? 'अहिले बनाउनुस्' : 'Generate Now'}
+              </button>
+            )}
+            <button
+              onClick={() => navigate('/settings#weekly-schedule')}
+              className="btn-ghost py-1.5 px-3 text-xs flex items-center gap-1.5"
+            >
+              ⚙️ {lang === 'ne' ? 'तालिका' : 'Schedule'}
+            </button>
+          </div>
         </div>
+        {genError && (
+          <p className="mt-2 text-xs text-red-400">⚠️ {genError}</p>
+        )}
       </div>
 
       {list.length === 0 ? (

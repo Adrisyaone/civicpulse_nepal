@@ -60,6 +60,7 @@ export const aiApi = {
 // ── Weekly Reports ────────────────────────────────────────────────────────────
 export const weeklyApi = {
   list:           ()           => q('getWeeklyReports'),
+  generate:       ()           => q('triggerWeeklyReport'),
   updateSchedule: (day, hour)  => q('updateWeeklySchedule', { day, hour }),
 }
 
