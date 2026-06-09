@@ -15,7 +15,7 @@ export default function AIReportsPage() {
   const [palika,   setPalika]   = useState(profile?.palika   || '')
   const [selected, setSelected] = useState(null)
   const generate = useGenerateAIReport()
-  const { data: reports, isLoading } = useAIReports()
+  const { data: reports, isLoading, isError, error } = useAIReports()
   const provinceObj = PROVINCES.find((p) => p.name_en === province)
 
   async function handleGenerate() {
@@ -88,7 +88,8 @@ export default function AIReportsPage() {
 
       <h2 className="section-title mb-3">{tr('prevReports')}</h2>
       {isLoading ? <div className="flex justify-center py-10"><Spinner size="lg" /></div>
-        : !reports?.length ? <EmptyState icon="✨" titleKey="noAIReports" />
+        : isError ? <div className="card p-4 text-sm text-red-400">⚠️ {error?.message || error?.error || 'Failed to load reports'}</div>
+        : !Array.isArray(reports) || !reports.length ? <EmptyState icon="✨" titleKey="noAIReports" />
         : (
           <div className="space-y-3">
             {reports.map((r,i)=>(

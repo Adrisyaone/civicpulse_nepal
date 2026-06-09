@@ -116,9 +116,13 @@ export function useDashboardStats(params = {}) {
 export function useGenerateAIReport() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data) => aiApi.generate(data),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['ai-reports'] }); toast.success('AI report generated!') },
-    onError:    () => toast.error('AI report failed'),
+    mutationFn: async (data) => {
+      const result = await aiApi.generate(data)
+      if (result && result.error) throw new Error(result.error)
+      return result
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['ai-reports'] }); toast.success('AI report generated!') },
+    onError:   (err) => toast.error(err?.message || err?.error || 'AI report failed'),
   })
 }
 

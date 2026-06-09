@@ -68,6 +68,7 @@ function doGet(e) {
       case 'getWeeklyReports':     result = getWeeklyReports();                break
       case 'triggerWeeklyReport':  result = generateWeeklyReport();            break
       case 'updateWeeklySchedule': result = updateWeeklySchedule(p);          break
+      case 'deleteWeeklyReport':   result = deleteWeeklyReport(p.id);         break
       // Drive
       case 'uploadPhoto':        result = uploadPhoto(p);          break
       // Health
@@ -211,6 +212,19 @@ function deleteReport(id) {
     }
   }
   throw new Error('Report not found: ' + id)
+}
+
+function deleteWeeklyReport(id) {
+  if (!id) throw new Error('id required')
+  var sheet = getSheet(SHEETS.WEEKLY)
+  var data  = sheet.getDataRange().getValues()
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(id)) {
+      sheet.deleteRow(i + 1)
+      return { ok: true, id: id }
+    }
+  }
+  throw new Error('Weekly report not found: ' + id)
 }
 
 function getNearbyReports(p) {

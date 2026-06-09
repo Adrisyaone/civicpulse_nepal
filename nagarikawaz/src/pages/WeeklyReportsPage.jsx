@@ -6,6 +6,7 @@ import { useLang } from '../context/LangContext'
 import { useAuth } from '../context/AuthContext'
 import { Spinner, EmptyState } from '../components/ui'
 import { formatDate } from '../utils/helpers'
+import toast from 'react-hot-toast'
 
 const SCHEDULE_KEY = 'weekly_report_schedule'
 const DAY_LABELS = {
@@ -117,7 +118,24 @@ export default function WeeklyReportsPage() {
       ) : (
         <div className="space-y-4">
           {list.map((r) => (
-            <WeeklyReportCard key={r.id} report={r} lang={lang} />
+            <WeeklyReportCard
+              key={r.id}
+              report={r}
+              lang={lang}
+              isAdmin={isAdmin}
+              onDelete={async (id) => {
+                if (!window.confirm(lang === 'ne'
+                  ? 'के तपाईं यो साप्ताहिक रिपोर्ट स्थायी रूपमा मेट्न चाहनुहुन्छ?'
+                  : 'Permanently delete this weekly report?')) return
+                try {
+                  await weeklyApi.delete(id)
+                  await queryClient.invalidateQueries({ queryKey: ['weekly-reports'] })
+                  toast.success(lang === 'ne' ? 'रिपोर्ट मेटियो' : 'Report deleted')
+                } catch (err) {
+                  toast.error(err?.error || 'Delete failed')
+                }
+              }}
+            />
           ))}
         </div>
       )}
@@ -133,11 +151,17 @@ export default function WeeklyReportsPage() {
   )
 }
 
-function WeeklyReportCard({ report: r, lang }) {
+function WeeklyReportCard({ report: r, lang, isAdmin, onDelete }) {
+  const [deleting, setDeleting] = useState(false)
   const summary = r.summary || {}
   const periodStart = r.period_start ? new Date(r.period_start) : null
   const periodEnd   = r.period_end   ? new Date(r.period_end)   : null
   const fmtShort = (d) => d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''
+
+  async function handleDelete() {
+    setDeleting(true)
+    try { await onDelete(r.id) } finally { setDeleting(false) }
+  }
 
   return (
     <div className="card p-5 hover:border-brand-700/40 transition-all">
@@ -154,6 +178,16 @@ function WeeklyReportCard({ report: r, lang }) {
           <span className="badge bg-brand-900/40 text-brand-400 border border-brand-700/30">
             📋 {r.report_count || 0} {lang === 'ne' ? 'रिपोर्ट' : 'reports'}
           </span>
+          {isAdmin && (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              title={lang === 'ne' ? 'मेट्नुहोस्' : 'Delete'}
+              className="p-1.5 rounded-lg text-red-500 hover:bg-red-500/10 transition-all disabled:opacity-50"
+            >
+              {deleting ? <Spinner size="sm" /> : '🗑️'}
+            </button>
+          )}
         </div>
       </div>
 
