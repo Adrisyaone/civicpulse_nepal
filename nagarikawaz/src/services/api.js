@@ -60,7 +60,7 @@ export const aiApi = {
 // ── Weekly Reports ────────────────────────────────────────────────────────────
 export const weeklyApi = {
   list:           ()           => q('getWeeklyReports'),
-  generate:       ()           => q('triggerWeeklyReport'),
+  generate:       ()           => http.get('', { params: { action: 'triggerWeeklyReport' }, timeout: 300000 }),
   updateSchedule: (day, hour)  => q('updateWeeklySchedule', { day, hour }),
 }
 

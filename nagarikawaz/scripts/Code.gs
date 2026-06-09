@@ -355,12 +355,15 @@ function generateAIReport(p) {
 
   var scope = [p.palika, p.district, p.province].filter(Boolean).join(', ') || 'All Nepal'
 
-  var issues = rows.map(function(r){ return {
-    id: r.id, title_np: r.title_np, title_en: r.title_en,
-    category: r.category, severity: r.severity, status: r.status,
-    palika: r.palika, district: r.district, province: r.province,
-    ward_no: r.ward_no, upvotes: r.upvotes, created_at: r.created_at,
-  }})
+  var issues = rows
+    .sort(function(a,b){ return (parseInt(b.upvotes)||0) - (parseInt(a.upvotes)||0) })
+    .slice(0, 60)
+    .map(function(r){ return {
+      id: r.id, title_en: r.title_en || r.title_np,
+      category: r.category, severity: r.severity, status: r.status,
+      palika: r.palika, district: r.district, province: r.province,
+      ward_no: r.ward_no, upvotes: r.upvotes, created_at: r.created_at,
+    }})
 
   var prompt =
     'You are a municipal infrastructure analyst for the Nepal government.\n\n' +
@@ -464,7 +467,10 @@ function callGemini(prompt, maxTokens) {
   var d = JSON.parse(res.getContentText())
   if (d.error) throw new Error('Gemini: ' + d.error.message)
   var cand = d.candidates && d.candidates[0]
-  if (!cand || cand.finishReason === 'SAFETY') throw new Error('Gemini returned no content')
+  if (!cand || !cand.content || !cand.content.parts || !cand.content.parts[0]) {
+    var reason = (cand && cand.finishReason) || (d.promptFeedback && d.promptFeedback.blockReason) || 'unknown'
+    throw new Error('Gemini returned no content (reason: ' + reason + ')')
+  }
   return cand.content.parts[0].text
 }
 
@@ -503,7 +509,8 @@ function createReportDoc(summary, scope, count) {
   doc.saveAndClose()
   var file = DriveApp.getFileById(doc.getId())
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW)
-  folder.addFile(file); DriveApp.getRootFolder().removeFile(file)
+  folder.addFile(file)
+  try { DriveApp.getRootFolder().removeFile(file) } catch(e) {}
   return 'https://docs.google.com/document/d/' + doc.getId() + '/edit'
 }
 
