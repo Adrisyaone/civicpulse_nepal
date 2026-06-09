@@ -84,7 +84,7 @@ function AppRoutes() {
             <Route path="/my-reports" element={<ProtectedRoute><MyReports /></ProtectedRoute>} />
             <Route path="/settings"   element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
 
-            <Route path="/dashboard"  element={<ProtectedRoute minRole="wada_adhikrit"><Dashboard /></ProtectedRoute>} />
+            <Route path="/dashboard"  element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/ai-reports" element={<ProtectedRoute minRole="palika_pramukh"><AIReports /></ProtectedRoute>} />
             <Route path="/admin"      element={<ProtectedRoute minRole="admin"><AdminPage /></ProtectedRoute>} />
 

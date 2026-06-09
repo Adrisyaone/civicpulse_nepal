@@ -26,6 +26,7 @@ export const reportsApi = {
   get:    (id)           => q('getReport', { id }),
   create: (data)         => q('createReport', data),
   update: (id, data)     => q('updateReport', { id, ...data }),
+  delete: (id)           => q('deleteReport', { id }),
   upvote: (id, userId)   => q('upvoteReport', { id, userId }),
   nearby: (lat, lng, r = 100) => q('getNearbyReports', { lat, lng, radius: r }),
   stats:  (p = {})       => q('getDashboardStats', p),

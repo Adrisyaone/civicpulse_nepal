@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker } from 'react-leaflet'
 import L from 'leaflet'
 import { useReport, useUpdateReport, useUpvoteReport, getLocalUpvoted } from '../hooks'
 import { useAuth } from '../context/AuthContext'
+import { reportsApi } from '../services/api'
 import { useLang } from '../context/LangContext'
 import { CategoryBadge, SeverityBadge, StatusBadge, ProgressBar, Spinner, EmptyState, Modal, WardTag } from '../components/ui'
 import CommentSection   from '../components/reports/CommentSection'
@@ -20,7 +21,8 @@ const pin = L.divIcon({
 export default function ReportDetailPage() {
   const { id }      = useParams()
   const navigate    = useNavigate()
-  const { isOfficer } = useAuth()
+  const { isOfficer, isAdmin } = useAuth()
+  const [deleting, setDeleting] = useState(false)
   const { lang, tr }  = useLang()
   const { data: r, isLoading } = useReport(id)
   const update  = useUpdateReport()
@@ -51,6 +53,21 @@ export default function ReportDetailPage() {
   async function quickStatus(s) {
     await update.mutateAsync({ id: r.id, status: s })
     toast.success(`${STATUSES[s]?.np} / ${STATUSES[s]?.en}`)
+  }
+
+  async function handleDelete() {
+    if (!window.confirm(lang === 'ne'
+      ? 'के तपाईं यो रिपोर्ट स्थायी रूपमा मेट्न चाहनुहुन्छ?'
+      : 'Permanently delete this report? This cannot be undone.')) return
+    setDeleting(true)
+    try {
+      await reportsApi.delete(r.id)
+      toast.success(lang === 'ne' ? 'रिपोर्ट मेटियो' : 'Report deleted')
+      navigate('/')
+    } catch (err) {
+      toast.error(err?.error || 'Delete failed')
+      setDeleting(false)
+    }
   }
 
   return (
@@ -180,6 +197,13 @@ export default function ReportDetailPage() {
                   </button>
                 ))}
               </div>
+              {isAdmin && (
+                <button onClick={handleDelete} disabled={deleting}
+                  className="w-full justify-center text-sm py-2 rounded-lg border border-red-700/40 text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50 flex items-center gap-2">
+                  {deleting ? <Spinner size="sm" /> : '🗑️'}
+                  {lang === 'ne' ? 'रिपोर्ट मेट्नुहोस्' : 'Delete Report'}
+                </button>
+              )}
             </div>
           )}
 

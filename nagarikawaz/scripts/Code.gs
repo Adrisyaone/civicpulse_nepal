@@ -58,6 +58,8 @@ function doGet(e) {
       case 'getUser':            result = getUser(p.id);           break
       case 'upsertUser':         result = upsertUser(p);           break
       case 'updateUserRole':     result = updateUserRole(p);       break
+      // Reports — admin
+      case 'deleteReport':       result = deleteReport(p.id);      break
       // AI
       case 'generateAIReport':   result = generateAIReport(p);    break
       case 'listAIReports':      result = listAIReports();         break
@@ -196,6 +198,19 @@ function updateReport(p) {
 
 function upvoteReport(p) {
   return incrementField(SHEETS.REPORTS, p.id, 'upvotes')
+}
+
+function deleteReport(id) {
+  if (!id) throw new Error('id required')
+  var sheet = getSheet(SHEETS.REPORTS)
+  var data  = sheet.getDataRange().getValues()
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(id)) {
+      sheet.deleteRow(i + 1)
+      return { ok: true, id: id }
+    }
+  }
+  throw new Error('Report not found: ' + id)
 }
 
 function getNearbyReports(p) {
@@ -445,11 +460,11 @@ function uploadPhoto(p) {
 }
 
 // =============================================================================
-// GEMINI API (free tier — gemini-2.0-flash)
+// GEMINI API (free tier — gemini-1.5-flash)
 // =============================================================================
 function callGemini(prompt, maxTokens) {
   if (!GEMINI_KEY) throw new Error('GEMINI_API_KEY not set in Script Properties')
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + GEMINI_KEY
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + GEMINI_KEY
   var res = UrlFetchApp.fetch(url, {
     method: 'post', contentType: 'application/json',
     payload: JSON.stringify({
@@ -808,29 +823,65 @@ function _buildWeeklyDoc(body, week, all, stats, ai, weekAgo, now) {
     body.appendParagraph('Trend: ' + ai.trend).setItalic(true)
   }
 
-  // ── Photo gallery ──
+  // ── Photo gallery — per-issue collage ──
   var photoReports = week.filter(function(r){ return r.photo_ids && r.photo_ids.trim() })
   if (photoReports.length > 0) {
     body.appendParagraph('').appendHorizontalRule()
     body.appendParagraph('📸 Photo Evidence').setHeading(DocumentApp.ParagraphHeading.HEADING2)
-    var photoCount = 0
-    photoReports.forEach(function(r){
-      if (photoCount >= 6) return
-      var ids = r.photo_ids.split(',').filter(Boolean)
-      ids.forEach(function(fid){
-        if (photoCount >= 6) return
-        try {
-          var file = DriveApp.getFileById(fid.trim())
-          var blob = file.getBlob().setName(fid + '.jpg')
-          var img = body.appendImage(blob)
-          img.setWidth(200)
-          body.appendParagraph((r.title_en || r.title_np || '') + ' — ' + (r.palika || '') + ', W-' + (r.ward_no || ''))
-            .setItalic(true).setFontSize(9)
-          photoCount++
-        } catch(e) {
-          Logger.log('Photo embed failed for ' + fid + ': ' + e.message)
-        }
+
+    var MAX_ISSUES = 10
+    var MAX_PHOTOS = 6   // per issue
+    var COLS       = 3
+    var IMG_W      = 155
+    var IMG_H      = 116 // 4:3 ratio
+
+    var issuesDone = 0
+    photoReports.forEach(function(r) {
+      if (issuesDone >= MAX_ISSUES) return
+      var ids = r.photo_ids.split(',').map(function(s){ return s.trim() }).filter(Boolean)
+      if (ids.length === 0) return
+
+      // Issue label
+      var location = [r.palika, r.district].filter(Boolean).join(', ') + (r.ward_no ? ', Ward ' + r.ward_no : '')
+      body.appendParagraph('📍 ' + (r.title_en || r.title_np || 'Issue') + (location ? ' — ' + location : ''))
+        .setBold(true).setFontSize(10)
+
+      // Load blobs (skip on error)
+      var blobs = []
+      ids.slice(0, MAX_PHOTOS).forEach(function(fid) {
+        try { blobs.push(DriveApp.getFileById(fid).getBlob()) }
+        catch(e) { Logger.log('Photo load failed: ' + fid + ' — ' + e.message) }
       })
+
+      if (blobs.length === 0) {
+        body.appendParagraph('(photos unavailable)').setItalic(true).setFontSize(9)
+      } else {
+        // Collage: COLS images per row, no border
+        var cols    = Math.min(blobs.length, COLS)
+        var numRows = Math.ceil(blobs.length / cols)
+        for (var rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          var rowBlobs = blobs.slice(rowIdx * cols, rowIdx * cols + cols)
+          var emptyRow = rowBlobs.map(function(){ return '' })
+          var tbl = body.appendTable([emptyRow])
+          tbl.setBorderWidth(0)
+          rowBlobs.forEach(function(blob, colIdx) {
+            var cell = tbl.getCell(0, colIdx)
+            cell.clear()
+            cell.setPaddingTop(3)
+            cell.setPaddingBottom(3)
+            cell.setPaddingLeft(3)
+            cell.setPaddingRight(3)
+            try {
+              cell.appendImage(blob).setWidth(IMG_W).setHeight(IMG_H)
+            } catch(e) {
+              cell.appendParagraph('⚠ unavailable').setItalic(true).setFontSize(8)
+            }
+          })
+        }
+      }
+
+      body.appendParagraph('').setFontSize(4) // narrow spacer between issues
+      issuesDone++
     })
   }
 
