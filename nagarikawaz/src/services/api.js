@@ -22,7 +22,7 @@ const q = (action, params = {}) => http.get('', { params: { action, ...params } 
 
 // ── Reports ───────────────────────────────────────────────────────────────────
 export const reportsApi = {
-  list:   (p = {})       => q('getReports', p),
+  list:   (p = {})       => q('getReports', p).then((d) => Array.isArray(d) ? d : (d?.reports || [])),
   get:    (id)           => q('getReport', { id }),
   create: (data)         => q('createReport', data),
   update: (id, data)     => q('updateReport', { id, ...data }),
