@@ -466,40 +466,59 @@ var ROLE_RANK = {
 }
 
 function upsertUser(p) {
-  // Gather ALL rows that share this email — includes manually-added Sheet rows
   var emailRows = p.email ? idxFilter(IDX.USERS, { email: p.email }) : []
 
-  // Highest role found across all email-matching rows (catches manually promoted rows)
+  // Highest role across all rows for this email (catches manually pre-seeded Sheet rows)
   var bestRole = emailRows.reduce(function(best, r) {
     return (ROLE_RANK[r.role] || 0) > (ROLE_RANK[best] || 0) ? r.role : best
   }, 'nagarik')
 
-  var existing = null
-  if (p.google_uid) existing = idxFind(IDX.USERS, 'google_uid', p.google_uid)
-  if (!existing && emailRows.length) {
-    // Prefer rows that already have an id (auto-created), else use first match
-    existing = emailRows.find(function(r) { return r.id }) || emailRows[0]
-  }
+  // Only match existing rows that have a proper id (incomplete pre-seeded rows are rebuilt below)
+  var existing = p.google_uid ? idxFind(IDX.USERS, 'google_uid', p.google_uid) : null
+  if (!existing) existing = emailRows.find(function(r) { return r.id }) || null
 
   if (existing) {
-    // Promote role if any Sheet row has a higher role (e.g. admin set manually)
-    if ((ROLE_RANK[bestRole] || 0) > (ROLE_RANK[existing.role] || 0) && existing.id) {
+    // Promote role if sheet has a higher role than the stored one
+    if ((ROLE_RANK[bestRole] || 0) > (ROLE_RANK[existing.role] || 0)) {
       idxUpdate(IDX.USERS, 'id', existing.id, { role: bestRole })
       existing.role = bestRole
     }
     // Backfill google_uid so future lookups skip the email scan
-    if (!existing.google_uid && p.google_uid && existing.id) {
+    if (!existing.google_uid && p.google_uid) {
       idxUpdate(IDX.USERS, 'id', existing.id, { google_uid: p.google_uid })
       existing.google_uid = p.google_uid
     }
-    if (existing.id) cacheSet(ck('user', existing.id), existing, 600)
+    cacheSet(ck('user', existing.id), existing, 600)
     return existing
   }
 
-  var id      = uuid()
-  var now     = new Date().toISOString()
-  var usersF  = driveFolder(CFG().ROOT_ID, 'users')
-  var folder  = driveFolder(usersF.getId(), id)
+  // No proper record found — clean up any incomplete pre-seeded rows for this email first
+  if (p.email) {
+    var sh       = getIdxSheet(IDX.USERS)
+    var hdrs     = IDX_HEADERS[IDX.USERS]
+    var eCol     = hdrs.indexOf('email')
+    var iCol     = hdrs.indexOf('id')
+    var shData   = sh.getDataRange().getValues()
+    for (var ri = shData.length - 1; ri >= 1; ri--) {
+      if (String(shData[ri][eCol]).trim() === sanitize(p.email) && !String(shData[ri][iCol]).trim()) {
+        sh.deleteRow(ri + 1)
+      }
+    }
+  }
+
+  // Create full user record — inherit role from any pre-seeded Sheet row
+  var id       = uuid()
+  var now      = new Date().toISOString()
+  var folderId = ''
+
+  // Drive folder creation is best-effort — Sheet write must always succeed
+  try {
+    var usersF = driveFolder(CFG().ROOT_ID, 'users')
+    var uDir   = driveFolder(usersF.getId(), id)
+    folderId   = uDir.getId()
+  } catch (driveErr) {
+    Logger.log('upsertUser: Drive folder creation failed (DRIVE_ROOT_FOLDER_ID missing or inaccessible): ' + driveErr.message)
+  }
 
   var profile = {
     id:         id,
@@ -509,23 +528,36 @@ function upsertUser(p) {
     name_np:    sanitize(p.name_np   || ''),
     phone:      sanitize(p.phone     || ''),
     gender:     sanitize(p.gender    || ''),
-    role:       'nagarik',
+    role:       bestRole,
     province:   sanitize(p.province  || ''),
     district:   sanitize(p.district  || ''),
     palika:     sanitize(p.palika    || ''),
-    ward_no:    p.ward_no   || '',
-    dept_id:    '',
+    ward_no:    p.ward_no  || '',
+    dept_id:    p.dept_id  || '',
     status:     'active',
     created_at: now,
+    folder_id:  folderId,
   }
 
-  driveWriteJSON(folder.getId(), 'profile.json', profile)
+  // Write profile.json to Drive only if folder was created successfully
+  if (folderId) {
+    try { driveWriteJSON(folderId, 'profile.json', profile) } catch (e) { Logger.log('profile.json write failed: ' + e.message) }
+  }
+
+  // Sheet index write always runs regardless of Drive status
   idxAppend(IDX.USERS, {
-    id: id, google_uid: p.google_uid || '', email: profile.email,
-    role: 'nagarik', province: profile.province, palika: profile.palika,
-    dept_id: '', folder_id: folder.getId(), created_at: now,
+    id:         id,
+    google_uid: profile.google_uid,
+    email:      profile.email,
+    role:       profile.role,
+    province:   profile.province,
+    palika:     profile.palika,
+    dept_id:    profile.dept_id,
+    folder_id:  folderId,
+    created_at: now,
   })
   cacheSet(ck('user', id), profile, 600)
+  Logger.log('upsertUser: created user ' + id + ' (' + profile.email + ') role=' + profile.role + ' folder=' + (folderId || 'NONE'))
   return profile
 }
 
@@ -537,13 +569,27 @@ function getUser(id) {
   var row = idxFind(IDX.USERS, 'id', id)
   if (!row) return null
 
-  var folder = DriveApp.getFolderById(row.folder_id)
-  var it     = folder.getFilesByName('profile.json')
-  if (!it.hasNext()) return row   // fallback to index data
+  // If no Drive folder recorded (Drive was unavailable at creation time), return index row
+  if (!row.folder_id) {
+    cacheSet(ck('user', id), row, 600)
+    return row
+  }
 
-  var profile = JSON.parse(it.next().getBlob().getDataAsString())
-  cacheSet(ck('user', id), profile, 600)
-  return profile
+  try {
+    var folder  = DriveApp.getFolderById(row.folder_id)
+    var it      = folder.getFilesByName('profile.json')
+    if (!it.hasNext()) {
+      cacheSet(ck('user', id), row, 600)
+      return row   // fallback to index data
+    }
+    var profile = JSON.parse(it.next().getBlob().getDataAsString())
+    cacheSet(ck('user', id), profile, 600)
+    return profile
+  } catch (e) {
+    Logger.log('getUser: Drive read failed for ' + id + ': ' + e.message)
+    cacheSet(ck('user', id), row, 600)
+    return row   // always return index data as fallback
+  }
 }
 
 function getUsers() {
@@ -1980,6 +2026,9 @@ function doGet(e) {
       case 'triggerWeeklyReport':     result = generateWeeklyReport();          break
       case 'getAuditTrail':           result = getAuditTrail(p.resourceId);     break
       case 'getAdminView':            result = getAdminView(p, auth);           break
+      case 'healthCheck':
+        result = runDiagnostics()
+        break
       case 'ping':
         result = { ok: true, ts: new Date().toISOString(), version: CFG().VERSION, emergency: PROPS.getProperty('EMERGENCY_MODE') === 'true' }
         break
@@ -2149,4 +2198,118 @@ function testPing() {
 function authorizeDrive() {
   var folder = driveFolder(CFG().ROOT_ID, '_system')
   Logger.log('Drive authorized. System folder: ' + folder.getId())
+}
+
+// =============================================================================
+// SECTION 23 — DIAGNOSTICS
+// Run this from the Apps Script editor: Execution → runDiagnostics
+// =============================================================================
+
+function runDiagnostics() {
+  var out = { ok: true, errors: [], warnings: [], info: {}, timestamp: new Date().toISOString() }
+  var cfg = CFG()
+
+  // --- Script Properties ---
+  if (!cfg.SS_ID) {
+    out.errors.push('SPREADSHEET_ID not set in Script Properties')
+    out.ok = false
+  }
+  if (!cfg.ROOT_ID) {
+    out.errors.push('DRIVE_ROOT_FOLDER_ID not set in Script Properties')
+    out.ok = false
+  }
+  if (!cfg.GEMINI_KEY)    out.warnings.push('GEMINI_API_KEY not set — AI features disabled')
+  if (!cfg.SPARROW_TOKEN) out.warnings.push('SPARROW_TOKEN not set — SMS disabled')
+  if (!cfg.ADMIN_EMAIL)   out.warnings.push('ADMIN_EMAIL not set — no alert emails')
+  if (cfg.HMAC_SECRET === 'CHANGE_ME_use_64_random_chars') {
+    out.warnings.push('HMAC_SECRET is using the insecure default — generate a 64-char random string')
+  }
+
+  // --- Spreadsheet access ---
+  if (cfg.SS_ID) {
+    try {
+      var ss     = SpreadsheetApp.openById(cfg.SS_ID)
+      var names  = ss.getSheets().map(function(s) { return s.getName() })
+      var needed = Object.values(IDX)
+      var miss   = needed.filter(function(n) { return names.indexOf(n) < 0 })
+      out.info.spreadsheet    = ss.getName()
+      out.info.existingSheets = names
+      if (miss.length) out.warnings.push('Sheet tabs missing (auto-created on first use): ' + miss.join(', '))
+
+      // Data counts
+      out.info.counts = {
+        reports:  idxRead(IDX.REPORTS).length,
+        users:    idxRead(IDX.USERS).length,
+        sessions: idxRead(IDX.SESSIONS).length,
+        depts:    idxRead(IDX.DEPTS).length,
+      }
+    } catch (e) {
+      out.errors.push('Cannot open Spreadsheet: ' + e.message)
+      out.ok = false
+    }
+  }
+
+  // --- Drive root folder ---
+  if (cfg.ROOT_ID) {
+    try {
+      var root    = DriveApp.getFolderById(cfg.ROOT_ID)
+      var subs    = []
+      var it      = root.getFolders()
+      while (it.hasNext()) subs.push(it.next().getName())
+      var reqFolders = ['reports','users','_system','_analytics','_ai_reports','_weekly_reports','_audit','_uploads_temp']
+      var missFolders = reqFolders.filter(function(f) { return subs.indexOf(f) < 0 })
+      out.info.driveFolderName = root.getName()
+      out.info.driveSubFolders = subs
+      if (missFolders.length) {
+        out.errors.push('Drive sub-folders missing — run setupSystem(): ' + missFolders.join(', '))
+        out.ok = false
+      }
+    } catch (e) {
+      out.errors.push('Cannot access Drive root folder: ' + e.message)
+      out.ok = false
+    }
+  }
+
+  // --- App config ---
+  out.info.appConfig = getAppConfig()
+
+  var msg = out.ok
+    ? '✅ All checks passed.'
+    : '❌ ' + out.errors.length + ' error(s) found.'
+  Logger.log(msg + '\n' + JSON.stringify(out, null, 2))
+  return out
+}
+
+// Test the full user-creation path — run this from the Apps Script editor
+// Check Execution Log for ✅ / ❌ lines
+function testUserCreation() {
+  var testEmail  = 'test_diag_' + Date.now() + '@example.com'
+  var testGuid   = 'test_guid_' + Date.now()
+  Logger.log('--- testUserCreation START ---')
+
+  try {
+    // 1. Create
+    var user = upsertUser({ email: testEmail, name_en: 'Diag Test', google_uid: testGuid })
+    Logger.log('✅ upsertUser returned id=' + user.id + ' role=' + user.role)
+
+    // 2. Verify it's in the Sheet
+    var row = idxFind(IDX.USERS, 'id', user.id)
+    if (row) {
+      Logger.log('✅ Row found in idx_users: email=' + row.email + ' role=' + row.role + ' folder_id=' + row.folder_id)
+    } else {
+      Logger.log('❌ Row NOT found in idx_users after upsertUser')
+    }
+
+    // 3. getUser round-trip
+    var fetched = getUser(user.id)
+    Logger.log(fetched ? '✅ getUser returned user' : '❌ getUser returned null')
+
+    // 4. Clean up test row
+    idxDeleteRow(IDX.USERS, 'id', user.id)
+    Logger.log('✅ Test row cleaned up')
+
+  } catch (e) {
+    Logger.log('❌ EXCEPTION: ' + e.message + '\n' + (e.stack || ''))
+  }
+  Logger.log('--- testUserCreation END ---')
 }
