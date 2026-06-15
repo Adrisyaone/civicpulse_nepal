@@ -6,7 +6,7 @@ import { RoleBadge } from './index'
 import { cn } from '../../utils/helpers'
 
 export default function Navbar() {
-  const { user, profile, isOfficer, isLead, isAdmin, signOut } = useAuth()
+  const { user, profile, isOfficer, isLead, isAdmin, canViewAs, viewAs, toggleViewAs, actualRole, signOut } = useAuth()
   const { lang, toggleLang, tr } = useLang()
   const loc      = useLocation()
   const navigate = useNavigate()
@@ -51,6 +51,18 @@ export default function Navbar() {
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-40 glass border-b border-brand-900/50">
+      {/* Citizen-view mode banner */}
+      {viewAs && (
+        <div className="flex items-center justify-center gap-3 px-4 py-1 text-xs font-medium"
+          style={{ background: 'linear-gradient(90deg, #7c3aed22, #7c3aed44, #7c3aed22)', borderBottom: '1px solid #7c3aed55' }}>
+          <span className="text-purple-300">👤 Viewing as Citizen (nagarik)</span>
+          <button onClick={toggleViewAs}
+            className="px-2 py-0.5 rounded text-purple-200 bg-purple-900/60 border border-purple-700/60 hover:bg-purple-800/60 transition-all text-[11px]">
+            Return to {actualRole === 'admin' ? 'Admin' : 'Officer'} View
+          </button>
+        </div>
+      )}
+
       {/* Nepal flag stripe */}
       <div className="flex h-[3px]">
         <div className="flex-1" style={{ background: '#DC143C' }} />
@@ -120,6 +132,18 @@ export default function Navbar() {
                         {i.icon} {tr(i.k)}
                       </Link>
                     ))}
+                    {canViewAs && (
+                      <button
+                        onClick={() => { toggleViewAs(); setMenu(false) }}
+                        className={cn(
+                          'w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-all',
+                          viewAs
+                            ? 'text-purple-300 hover:bg-purple-900/30'
+                            : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+                        )}>
+                        {viewAs ? '👑 Return to Admin View' : '👤 View as Citizen'}
+                      </button>
+                    )}
                     <div className="border-t border-slate-800 mt-1 pt-1">
                       <button onClick={() => { signOut(); setMenu(false) }}
                         className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10">
