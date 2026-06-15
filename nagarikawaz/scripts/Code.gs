@@ -92,7 +92,27 @@ var RBAC = {
     'getUser','upsertUser','uploadPhoto','getDashboardStats',
     'getWeeklyReports','listAIReports','getHeatmap','ping',
   ],
+  samudaya_moderator: [   // community moderator — same as nagarik
+    'createReport','getReport','getReports','getNearbyReports',
+    'upvoteReport','addComment','getComments','getProgress',
+    'getUser','upsertUser','uploadPhoto','getDashboardStats',
+    'getWeeklyReports','listAIReports','getHeatmap','ping',
+  ],
   officer: [
+    'createReport','getReport','getReports','getNearbyReports',
+    'upvoteReport','addComment','getComments','addProgress','getProgress',
+    'updateReport','getUser','upsertUser','uploadPhoto','getDashboardStats',
+    'getWeeklyReports','listAIReports','generateAIReport','prioritizeReport',
+    'getHeatmap','getRiskZones','getAuditTrail','ping',
+  ],
+  wada_adhikrit: [        // ward officer — same as officer
+    'createReport','getReport','getReports','getNearbyReports',
+    'upvoteReport','addComment','getComments','addProgress','getProgress',
+    'updateReport','getUser','upsertUser','uploadPhoto','getDashboardStats',
+    'getWeeklyReports','listAIReports','generateAIReport','prioritizeReport',
+    'getHeatmap','getRiskZones','getAuditTrail','ping',
+  ],
+  palika_officer: [       // palika officer — same as officer
     'createReport','getReport','getReports','getNearbyReports',
     'upvoteReport','addComment','getComments','addProgress','getProgress',
     'updateReport','getUser','upsertUser','uploadPhoto','getDashboardStats',
@@ -105,7 +125,17 @@ var RBAC = {
     'updateReport','getUser','upsertUser','getUsers','updateUserRole',
     'uploadPhoto','getDashboardStats','getWeeklyReports','triggerWeeklyReport',
     'listAIReports','generateAIReport','prioritizeReport',
-    'getHeatmap','getRiskZones','getVulnerabilityScore','getAuditTrail','ping',
+    'getHeatmap','getRiskZones','getVulnerabilityScore','getAuditTrail',
+    'getAdminView','ping',
+  ],
+  palika_pramukh: [       // palika chief — same as municipality_admin
+    'createReport','getReport','getReports','getNearbyReports',
+    'upvoteReport','addComment','getComments','addProgress','getProgress',
+    'updateReport','getUser','upsertUser','getUsers','updateUserRole',
+    'uploadPhoto','getDashboardStats','getWeeklyReports','triggerWeeklyReport',
+    'listAIReports','generateAIReport','prioritizeReport',
+    'getHeatmap','getRiskZones','getVulnerabilityScore','getAuditTrail',
+    'getAdminView','ping',
   ],
   province_admin: [
     'createReport','getReport','getReports','getNearbyReports',
@@ -114,9 +144,28 @@ var RBAC = {
     'uploadPhoto','getDashboardStats','getWeeklyReports','triggerWeeklyReport',
     'listAIReports','generateAIReport','prioritizeReport',
     'getHeatmap','getRiskZones','getVulnerabilityScore','getAuditTrail',
-    'activateEmergencyMode','emergencyBroadcast','ping',
+    'activateEmergencyMode','emergencyBroadcast','getAdminView','ping',
+  ],
+  jilla_samanwayak: [     // district coordinator — same as province_admin
+    'createReport','getReport','getReports','getNearbyReports',
+    'upvoteReport','addComment','getComments','addProgress','getProgress',
+    'updateReport','deleteReport','getUser','upsertUser','getUsers','updateUserRole',
+    'uploadPhoto','getDashboardStats','getWeeklyReports','triggerWeeklyReport',
+    'listAIReports','generateAIReport','prioritizeReport',
+    'getHeatmap','getRiskZones','getVulnerabilityScore','getAuditTrail',
+    'activateEmergencyMode','emergencyBroadcast','getAdminView','ping',
+  ],
+  pradesh_adhikrit: [     // province officer — same as province_admin
+    'createReport','getReport','getReports','getNearbyReports',
+    'upvoteReport','addComment','getComments','addProgress','getProgress',
+    'updateReport','deleteReport','getUser','upsertUser','getUsers','updateUserRole',
+    'uploadPhoto','getDashboardStats','getWeeklyReports','triggerWeeklyReport',
+    'listAIReports','generateAIReport','prioritizeReport',
+    'getHeatmap','getRiskZones','getVulnerabilityScore','getAuditTrail',
+    'activateEmergencyMode','emergencyBroadcast','getAdminView','ping',
   ],
   system_admin: ['*'],
+  admin: ['*'],            // alias for system_admin — use this role name in the Sheet
 }
 
 // =============================================================================
@@ -223,7 +272,10 @@ function idxRead(sheetName) {
     var obj = {}
     headers.forEach(function(h, i) { obj[h] = row[i] != null ? String(row[i]).trim() : '' })
     return obj
-  }).filter(function(r) { return r.id || r.token_hash || r.key || r.timestamp })
+  }).filter(function(r) {
+    // Skip completely blank rows; keep any row with at least one non-empty cell
+    return Object.keys(r).some(function(k) { return r[k] !== '' })
+  })
 }
 
 function idxAppend(sheetName, rowObj) {
@@ -404,11 +456,45 @@ function rateLimit(ip, action, maxPerMinute) {
 // SECTION 7 — USER MANAGEMENT
 // =============================================================================
 
+var ROLE_RANK = {
+  nagarik:0,
+  samudaya_moderator:1,
+  officer:2, wada_adhikrit:2, palika_officer:2,
+  municipality_admin:3, palika_pramukh:3,
+  jilla_samanwayak:4, pradesh_adhikrit:4, province_admin:4,
+  system_admin:5, admin:5,
+}
+
 function upsertUser(p) {
+  // Gather ALL rows that share this email — includes manually-added Sheet rows
+  var emailRows = p.email ? idxFilter(IDX.USERS, { email: p.email }) : []
+
+  // Highest role found across all email-matching rows (catches manually promoted rows)
+  var bestRole = emailRows.reduce(function(best, r) {
+    return (ROLE_RANK[r.role] || 0) > (ROLE_RANK[best] || 0) ? r.role : best
+  }, 'nagarik')
+
   var existing = null
   if (p.google_uid) existing = idxFind(IDX.USERS, 'google_uid', p.google_uid)
-  if (!existing && p.email) existing = idxFind(IDX.USERS, 'email', p.email)
-  if (existing) { cacheSet(ck('user', existing.id), existing, 600); return existing }
+  if (!existing && emailRows.length) {
+    // Prefer rows that already have an id (auto-created), else use first match
+    existing = emailRows.find(function(r) { return r.id }) || emailRows[0]
+  }
+
+  if (existing) {
+    // Promote role if any Sheet row has a higher role (e.g. admin set manually)
+    if ((ROLE_RANK[bestRole] || 0) > (ROLE_RANK[existing.role] || 0) && existing.id) {
+      idxUpdate(IDX.USERS, 'id', existing.id, { role: bestRole })
+      existing.role = bestRole
+    }
+    // Backfill google_uid so future lookups skip the email scan
+    if (!existing.google_uid && p.google_uid && existing.id) {
+      idxUpdate(IDX.USERS, 'id', existing.id, { google_uid: p.google_uid })
+      existing.google_uid = p.google_uid
+    }
+    if (existing.id) cacheSet(ck('user', existing.id), existing, 600)
+    return existing
+  }
 
   var id      = uuid()
   var now     = new Date().toISOString()
@@ -487,6 +573,108 @@ function updateUserRole(p, auth) {
   cacheInvalidate(ck('user', p.id))
   auditLog(auth.user_id, 'updateUserRole', p.id, 'ok', { new_role: p.role })
   return { ok: true }
+}
+
+// =============================================================================
+// SECTION 7B — ADMIN VIEW & APP CONFIGURATION
+// =============================================================================
+
+// Returns a full admin dashboard payload (reports + users + stats + config)
+function getAdminView(p, auth) {
+  var sess = authorize(auth.token, 'getAdminView')
+
+  var stats          = getDashboardStats(p || {})
+  var users          = idxRead(IDX.USERS).map(function(r) {
+    return { id: r.id, email: r.email, role: r.role, province: r.province, palika: r.palika, created_at: r.created_at }
+  })
+  var allReports     = idxRead(IDX.REPORTS)
+  var recentReports  = allReports.slice().sort(function(a, b) {
+    return new Date(b.created_at) - new Date(a.created_at)
+  }).slice(0, 50)
+  var criticalOpen   = allReports.filter(function(r) {
+    return r.severity === 'critical' && ['samaadhaan','banda'].indexOf(r.status) < 0
+  })
+  var pendingReports = allReports.filter(function(r) { return r.status === 'darta' })
+  var inProgressReports = allReports.filter(function(r) { return r.status === 'in_progress' })
+
+  return {
+    stats:            stats,
+    users:            users,
+    recentReports:    recentReports,
+    criticalOpen:     criticalOpen,
+    pendingReports:   pendingReports.length,
+    inProgress:       inProgressReports.length,
+    totalReports:     allReports.length,
+    appConfig:        getAppConfig(),
+    emergencyMode:    PROPS.getProperty('EMERGENCY_MODE') === 'true',
+    emergencyReason:  PROPS.getProperty('EMERGENCY_REASON') || '',
+    viewerRole:       sess.role,
+  }
+}
+
+// Returns the citizen-facing view config and public data summary
+function getCitizenView(p) {
+  var cfg  = getAppConfig()
+  var stats = getDashboardStats(p || {})
+  return {
+    appName:      cfg.app_name,
+    appNameLocal: cfg.app_name_local,
+    country:      cfg.country,
+    countryName:  cfg.country_name,
+    currency:     cfg.currency,
+    geoLevels:    cfg.geo_levels,
+    stats:        stats,
+    emergencyMode: PROPS.getProperty('EMERGENCY_MODE') === 'true',
+  }
+}
+
+// Returns current app/country configuration (readable by all)
+function getAppConfig() {
+  var defaultGeoLevels = JSON.stringify(['province','district','palika','ward'])
+  var defaultEmergencyKw = JSON.stringify(['flood','collapse','fire','landslide','explosion',
+    'बाढी','पहिरो','आगलागी','मृत्यु','घाइते','भत्कियो','डुब्यो'])
+  return {
+    app_name:                  PROPS.getProperty('APP_NAME')                  || 'NagarikAwaz',
+    app_name_local:            PROPS.getProperty('APP_NAME_LOCAL')            || 'नागरिक आवाज',
+    country:                   PROPS.getProperty('COUNTRY')                   || 'nepal',
+    country_name:              PROPS.getProperty('COUNTRY_NAME')              || 'Nepal',
+    currency:                  PROPS.getProperty('CURRENCY')                  || 'NPR',
+    timezone:                  PROPS.getProperty('TIMEZONE')                  || 'Asia/Kathmandu',
+    locale:                    PROPS.getProperty('LOCALE')                    || 'ne-NP',
+    geo_levels:                JSON.parse(PROPS.getProperty('GEO_LEVELS')     || defaultGeoLevels),
+    sms_provider:              PROPS.getProperty('SMS_PROVIDER')              || 'sparrow',
+    emergency_keywords_local:  JSON.parse(PROPS.getProperty('EMERGENCY_KEYWORDS_LOCAL') || defaultEmergencyKw),
+    site_url:                  PROPS.getProperty('SITE_URL')                  || 'https://nagarikawaz.netlify.app',
+  }
+}
+
+// Update app name, country, or any developer-configurable setting (admin only)
+function updateAppConfig(p, auth) {
+  authorize(auth.token, 'updateAppConfig')
+  var allowedKeys = {
+    app_name:                 'APP_NAME',
+    app_name_local:           'APP_NAME_LOCAL',
+    country:                  'COUNTRY',
+    country_name:             'COUNTRY_NAME',
+    currency:                 'CURRENCY',
+    timezone:                 'TIMEZONE',
+    locale:                   'LOCALE',
+    geo_levels:               'GEO_LEVELS',
+    sms_provider:             'SMS_PROVIDER',
+    emergency_keywords_local: 'EMERGENCY_KEYWORDS_LOCAL',
+    site_url:                 'SITE_URL',
+    admin_email:              'ADMIN_EMAIL',
+    sparrow_identity:         'SPARROW_IDENTITY',
+  }
+  var updated = []
+  Object.keys(allowedKeys).forEach(function(field) {
+    if (p[field] === undefined) return
+    var val = (typeof p[field] === 'object') ? JSON.stringify(p[field]) : String(p[field])
+    PROPS.setProperty(allowedKeys[field], val)
+    updated.push(field)
+  })
+  auditLog(auth.user_id, 'updateAppConfig', 'system', 'ok', { updated: updated })
+  return { ok: true, updated: updated, config: getAppConfig() }
 }
 
 // =============================================================================
@@ -945,13 +1133,20 @@ function aiCategorize(text_np, text_en) {
 }
 
 // Keyword-based emergency detection (no API call — instant)
+// Base keywords are always checked; additional local keywords come from EMERGENCY_KEYWORDS_LOCAL property
 function detectEmergencyKeywords(text) {
-  var keywords = [
+  var base = [
     'flood','flooding','collapse','collapsed','fire','death','fatality','injury',
     'landslide','bridge break','road break','sinking','explosion','dam breach',
-    'बाढी','पहिरो','आगलागी','मृत्यु','घाइते','भत्कियो','डुब्यो'
   ]
-  var lower = text.toLowerCase()
+  var localKw = []
+  try {
+    var stored = PROPS.getProperty('EMERGENCY_KEYWORDS_LOCAL')
+    localKw = stored ? JSON.parse(stored) : ['बाढी','पहिरो','आगलागी','मृत्यु','घाइते','भत्कियो','डुब्यो']
+  } catch (e) { localKw = ['बाढी','पहिरो','आगलागी','मृत्यु','घाइते','भत्कियो','डुब्यो'] }
+
+  var keywords = base.concat(localKw)
+  var lower    = text.toLowerCase()
   for (var i = 0; i < keywords.length; i++) {
     if (lower.indexOf(keywords[i]) >= 0) return true
   }
@@ -1226,15 +1421,30 @@ function getVulnerabilityScore(palika) {
 
 function sendEmail(to, subject, bodyText) {
   if (!to) return
+  var appName = PROPS.getProperty('APP_NAME') || 'NagarikAwaz'
+  var appNameLocal = PROPS.getProperty('APP_NAME_LOCAL') || 'नागरिक आवाज'
   try {
-    MailApp.sendEmail({ to: to, subject: '[NagarikAwaz] ' + subject, body: bodyText, name: 'नागरिक आवाज' })
+    MailApp.sendEmail({ to: to, subject: '[' + appName + '] ' + subject, body: bodyText, name: appNameLocal })
   } catch (e) { Logger.log('Email failed to ' + to + ': ' + e.message) }
 }
 
-// Sparrow SMS — Nepal (https://sparrowsms.com)
+// SMS dispatch — routes to the configured provider (sparrow for Nepal, twilio for others)
 function sendSMS(phone, message) {
+  if (!phone) return
+  var provider = PROPS.getProperty('SMS_PROVIDER') || 'sparrow'
+  if (provider === 'sparrow') {
+    _sendSMS_Sparrow(phone, message)
+  } else if (provider === 'twilio') {
+    _sendSMS_Twilio(phone, message)
+  } else {
+    Logger.log('SMS provider "' + provider + '" not configured — skipping SMS to ' + phone)
+  }
+}
+
+// Sparrow SMS — Nepal (https://sparrowsms.com)
+function _sendSMS_Sparrow(phone, message) {
   var token = CFG().SPARROW_TOKEN
-  if (!token || !phone) return
+  if (!token) return
 
   var normalized = String(phone).replace(/[^0-9]/g, '')
   if (normalized.charAt(0) === '0') normalized = '977' + normalized.substr(1)
@@ -1247,7 +1457,24 @@ function sendSMS(phone, message) {
       payload:            JSON.stringify({ token: token, identity: CFG().SPARROW_ID, to: normalized, text: message.substr(0, 160) }),
       muteHttpExceptions: true,
     })
-  } catch (e) { Logger.log('SMS failed to ' + phone + ': ' + e.message) }
+  } catch (e) { Logger.log('Sparrow SMS failed to ' + phone + ': ' + e.message) }
+}
+
+// Twilio SMS — international (set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM in Script Properties)
+function _sendSMS_Twilio(phone, message) {
+  var sid   = PROPS.getProperty('TWILIO_ACCOUNT_SID')
+  var token = PROPS.getProperty('TWILIO_AUTH_TOKEN')
+  var from  = PROPS.getProperty('TWILIO_FROM')
+  if (!sid || !token || !from) { Logger.log('Twilio not fully configured — set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM'); return }
+
+  try {
+    UrlFetchApp.fetch('https://api.twilio.com/2010-04-01/Accounts/' + sid + '/Messages.json', {
+      method:             'post',
+      headers:            { Authorization: 'Basic ' + Utilities.base64Encode(sid + ':' + token) },
+      payload:            { To: phone, From: from, Body: message.substr(0, 160) },
+      muteHttpExceptions: true,
+    })
+  } catch (e) { Logger.log('Twilio SMS failed to ' + phone + ': ' + e.message) }
 }
 
 function notifyNewReport(report) {
@@ -1706,6 +1933,8 @@ function doPost(e) {
       case 'activateEmergencyMode':  return json(activateEmergencyMode(p, auth))
       case 'deactivateEmergencyMode':return json(deactivateEmergencyMode(auth))
       case 'emergencyBroadcast':     return json(emergencyBroadcast(p, auth))
+      // Admin config
+      case 'updateAppConfig':        return json(updateAppConfig(p, auth))
       default:                       return json({ error: 'Unknown POST action: ' + action })
     }
   } catch (err) {
@@ -1739,14 +1968,18 @@ function doGet(e) {
       case 'getWeeklyReports':        result = getWeeklyReports();              break
       case 'listAIReports':           result = listAIReports();                 break
       case 'getEmergencyDashboard':   result = getEmergencyDashboard();         break
+      // Public reads — no auth required
+      case 'getCitizenView':          result = getCitizenView(p);               break
+      case 'getAppConfig':            result = getAppConfig();                  break
       // Auth required
       case 'upvoteReport':            result = upvoteReport(p, auth);           break
       case 'getUser':                 result = getUser(p.id);                   break
-      case 'getUsers':                result = getUsers();                      break
+      case 'getUsers':                authorize(auth.token, 'getUsers'); result = getUsers(); break
       case 'deleteReport':            result = deleteReport(p.id, auth);        break
       case 'prioritizeReport':        result = prioritizeReport(p.id, auth);    break
       case 'triggerWeeklyReport':     result = generateWeeklyReport();          break
       case 'getAuditTrail':           result = getAuditTrail(p.resourceId);     break
+      case 'getAdminView':            result = getAdminView(p, auth);           break
       case 'ping':
         result = { ok: true, ts: new Date().toISOString(), version: CFG().VERSION, emergency: PROPS.getProperty('EMERGENCY_MODE') === 'true' }
         break
