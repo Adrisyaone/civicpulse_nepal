@@ -10,7 +10,7 @@ import { CategoryBadge, SeverityBadge, StatusBadge, ProgressBar, Spinner, EmptyS
 import CommentSection   from '../components/reports/CommentSection'
 import ProgressTimeline from '../components/reports/ProgressTimeline'
 import { formatDate, statusToProgress, driveThumb, driveView, cn } from '../utils/helpers'
-import { STATUSES, DEPARTMENTS } from '../utils/constants'
+import { STATUSES, CATEGORIES, SEVERITIES, DEPARTMENTS } from '../utils/constants'
 import toast from 'react-hot-toast'
 
 const pin = L.divIcon({
@@ -30,6 +30,8 @@ export default function ReportDetailPage() {
 
   const [tab,          setTab]       = useState('timeline')
   const [aModal,       setAModal]    = useState(false)
+  const [editOpen,     setEditOpen]  = useState(false)
+  const [editForm,     setEditForm]  = useState({})
   const [alreadyVoted, setVoted]     = useState(false)
   const [localUpvotes, setLocalUpvotes] = useState(null)
   React.useEffect(() => { if (r?.id) setVoted(getLocalUpvoted().has(String(r.id))) }, [r?.id])
@@ -44,15 +46,31 @@ export default function ReportDetailPage() {
     </div>
   )
 
-  const title   = lang === 'ne' ? (r.title_np || r.title_en) : (r.title_en || r.title_np)
-  const desc    = lang === 'ne' ? (r.description_np || r.description_en) : (r.description_en || r.description_np)
-  const photos  = (r.photo_ids || '').split(',').filter(Boolean)
+  const title   = lang === 'ne' ? (r.title_np || r.title_en || r.title) : (r.title_en || r.title_np || r.title)
+  const desc    = lang === 'ne' ? (r.description_np || r.description_en || r.description) : (r.description_en || r.description_np || r.description)
+  const photos  = Array.isArray(r.photo_ids) ? r.photo_ids.filter(Boolean) : (r.photo_ids || '').split(',').filter(Boolean)
   const prog    = statusToProgress(r.status)
   const curStep = STATUSES[r.status]?.step ?? 0
 
   async function quickStatus(s) {
     await update.mutateAsync({ id: r.id, status: s })
     toast.success(`${STATUSES[s]?.np} / ${STATUSES[s]?.en}`)
+  }
+
+  function openEdit() {
+    setEditForm({
+      title:       r.title || '',
+      description: r.description || '',
+      category:    r.category || 'other',
+      severity:    r.severity || 'medium',
+      status:      r.status  || 'open',
+      assigned_to: r.assigned_to || '',
+      address:     r.address || '',
+      ward_no:     r.ward_no || '',
+      palika:      r.palika || '',
+      district:    r.district || '',
+    })
+    setEditOpen(true)
   }
 
   async function handleDelete() {
@@ -82,9 +100,6 @@ export default function ReportDetailPage() {
               <CategoryBadge category={r.category} />
               <SeverityBadge severity={r.severity} />
               <StatusBadge   status={r.status} />
-              {r.priority_score > 0 && (
-                <span className={cn('badge', r.priority_score >= 80 ? 'bg-red-500/20 text-red-400' : 'bg-orange-500/20 text-orange-400')}>⚡ {r.priority_score}</span>
-              )}
             </div>
             <h1 className="font-display font-bold text-xl text-white mb-2">{title}</h1>
             <div className="mb-3"><WardTag palika={r.palika} wardNo={r.ward_no} district={r.district} /></div>
@@ -98,7 +113,7 @@ export default function ReportDetailPage() {
                 [tr('reportedBy'),  r.submitted_by],
                 [tr('submitted'),   formatDate(r.created_at)],
                 [lang === 'ne' ? 'जिल्ला' : 'District', r.district || '—'],
-                [tr('department'),  r.department || tr('unassigned')],
+                [lang === 'ne' ? 'जिम्मेवार' : 'Assigned to', r.assigned_to || tr('unassigned')],
                 r.updated_at  && [tr('updated'),  formatDate(r.updated_at)],
                 r.resolved_at && [tr('resolved'), formatDate(r.resolved_at)],
               ].filter(Boolean).map(([k, v]) => (
@@ -131,9 +146,9 @@ export default function ReportDetailPage() {
                   <Marker position={[parseFloat(r.lat), parseFloat(r.lng)]} icon={pin} />
                 </MapContainer>
               </div>
-              {(r.address_np || r.address_en) && (
+              {r.address && (
                 <div className="px-4 py-2 text-xs text-slate-500 border-t border-slate-800">
-                  📍 {lang === 'ne' ? (r.address_np || r.address_en) : (r.address_en || r.address_np)}
+                  📍 {r.address}
                 </div>
               )}
             </div>
@@ -188,12 +203,12 @@ export default function ReportDetailPage() {
                 🏢 {tr('assignDept')}
               </button>
               <div className="grid grid-cols-2 gap-2">
-                {['jaacha','praapta','kaarwaahi_bhairaha','samaadhaan'].map((s) => (
+                {Object.entries(STATUSES).map(([s, v]) => (
                   <button key={s} onClick={() => quickStatus(s)}
                     disabled={r.status === s || update.isPending}
                     className={cn('text-xs py-1.5 px-2 rounded-lg border transition-all disabled:opacity-30',
-                      STATUSES[s]?.bg, STATUSES[s]?.text, 'border-slate-700 hover:border-slate-500')}>
-                    {lang === 'ne' ? STATUSES[s]?.np : STATUSES[s]?.en}
+                      v.bg, v.text, 'border-slate-700 hover:border-slate-500')}>
+                    {lang === 'ne' ? v.np : v.en}
                   </button>
                 ))}
               </div>
@@ -201,8 +216,12 @@ export default function ReportDetailPage() {
           )}
 
           {isAdmin && (
-            <div className="card p-4">
-              <h3 className="section-title mb-2 text-red-400">⚠️ {lang === 'ne' ? 'एडमिन' : 'Admin'}</h3>
+            <div className="card p-4 space-y-2">
+              <h3 className="section-title mb-1 text-amber-400">⚙️ {lang === 'ne' ? 'एडमिन' : 'Admin'}</h3>
+              <button onClick={openEdit}
+                className="w-full justify-center text-sm py-2 rounded-lg border border-brand-700/40 text-brand-400 hover:bg-brand-500/10 transition-all flex items-center gap-2">
+                ✏️ {lang === 'ne' ? 'रिपोर्ट सम्पादन' : 'Edit Report'}
+              </button>
               <button onClick={handleDelete} disabled={deleting}
                 className="w-full justify-center text-sm py-2 rounded-lg border border-red-700/40 text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50 flex items-center gap-2">
                 {deleting ? <Spinner size="sm" /> : '🗑️'}
@@ -233,7 +252,7 @@ export default function ReportDetailPage() {
         </div>
       </div>
 
-      {/* Assign modal */}
+      {/* Assign dept modal */}
       <Modal open={aModal} onClose={() => setAModal(false)} titleKey="assignDept">
         <div className="p-5 space-y-4">
           <div>
@@ -255,6 +274,71 @@ export default function ReportDetailPage() {
             <button className="btn-primary" disabled={update.isPending}
               onClick={async () => { await update.mutateAsync({ id: r.id, ...aForm }); setAModal(false) }}>
               {update.isPending ? <Spinner size="sm" /> : tr('save')}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Admin full-edit modal */}
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title={lang === 'ne' ? 'रिपोर्ट सम्पादन' : 'Edit Report'}>
+        <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+          <div>
+            <label className="label">{lang === 'ne' ? 'शीर्षक' : 'Title'}</label>
+            <input value={editForm.title || ''} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} className="input text-sm" />
+          </div>
+          <div>
+            <label className="label">{lang === 'ne' ? 'विवरण' : 'Description'}</label>
+            <textarea value={editForm.description || ''} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} className="input text-sm" rows={3} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">{lang === 'ne' ? 'श्रेणी' : 'Category'}</label>
+              <select value={editForm.category || 'other'} onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))} className="input text-sm">
+                {Object.entries(CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v.en}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">{lang === 'ne' ? 'गम्भीरता' : 'Severity'}</label>
+              <select value={editForm.severity || 'medium'} onChange={(e) => setEditForm((f) => ({ ...f, severity: e.target.value }))} className="input text-sm">
+                {Object.entries(SEVERITIES).map(([k, v]) => <option key={k} value={k}>{v.en}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">{lang === 'ne' ? 'स्थिति' : 'Status'}</label>
+              <select value={editForm.status || 'open'} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))} className="input text-sm">
+                {Object.entries(STATUSES).map(([k, v]) => <option key={k} value={k}>{v.en} / {v.np}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">{lang === 'ne' ? 'जिम्मेवार अधिकारी' : 'Assigned To'}</label>
+              <input value={editForm.assigned_to || ''} onChange={(e) => setEditForm((f) => ({ ...f, assigned_to: e.target.value }))} className="input text-sm" placeholder="Officer name…" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="label">{lang === 'ne' ? 'पालिका' : 'Palika'}</label>
+              <input value={editForm.palika || ''} onChange={(e) => setEditForm((f) => ({ ...f, palika: e.target.value }))} className="input text-sm" />
+            </div>
+            <div>
+              <label className="label">{lang === 'ne' ? 'जिल्ला' : 'District'}</label>
+              <input value={editForm.district || ''} onChange={(e) => setEditForm((f) => ({ ...f, district: e.target.value }))} className="input text-sm" />
+            </div>
+            <div>
+              <label className="label">{lang === 'ne' ? 'वडा' : 'Ward'}</label>
+              <input type="number" value={editForm.ward_no || ''} onChange={(e) => setEditForm((f) => ({ ...f, ward_no: e.target.value }))} className="input text-sm" min="1" max="35" />
+            </div>
+          </div>
+          <div>
+            <label className="label">{lang === 'ne' ? 'ठेगाना' : 'Address'}</label>
+            <input value={editForm.address || ''} onChange={(e) => setEditForm((f) => ({ ...f, address: e.target.value }))} className="input text-sm" />
+          </div>
+          <div className="flex gap-3 justify-end pt-2">
+            <button className="btn-ghost" onClick={() => setEditOpen(false)}>{tr('cancel')}</button>
+            <button className="btn-primary" disabled={update.isPending}
+              onClick={async () => { await update.mutateAsync({ id: r.id, ...editForm }); setEditOpen(false) }}>
+              {update.isPending ? <Spinner size="sm" /> : (lang === 'ne' ? 'सुरक्षित गर्नुहोस्' : 'Save Changes')}
             </button>
           </div>
         </div>

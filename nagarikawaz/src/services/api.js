@@ -50,6 +50,9 @@ export const usersApi = {
   get:        (id)       => q('getUser', { id }),
   upsert:     (data)     => q('upsertUser', data),
   updateRole: (id, data) => q('updateUserRole', { id, ...data }),
+  update:     (id, data) => q('updateUser',     { id, ...data }),
+  create:     (data)     => q('createUser', data),
+  delete:     (id)       => q('deleteUser', { id }),
 }
 
 // ── AI ────────────────────────────────────────────────────────────────────────

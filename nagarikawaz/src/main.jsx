@@ -6,11 +6,43 @@ import { Toaster } from 'react-hot-toast'
 import App from './App'
 import './styles/globals.css'
 
+const CACHE_KEY = 'nw_query_cache'
+const CACHE_TTL = 12 * 60 * 60 * 1000 // 12 hours
+
 const qc = new QueryClient({
   defaultOptions: {
-    queries:   { staleTime: 120000, retry: 2, refetchOnWindowFocus: false },
+    queries: {
+      staleTime: 120000,
+      gcTime: CACHE_TTL,
+      retry: 2,
+      refetchOnWindowFocus: false,
+      networkMode: 'offlineFirst',
+    },
     mutations: { retry: 1 },
   },
+})
+
+// Restore cached data from localStorage on startup so the app works offline immediately
+try {
+  const saved = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')
+  Object.entries(saved).forEach(([key, { data, ts }]) => {
+    if (Date.now() - ts < CACHE_TTL) {
+      try { qc.setQueryData(JSON.parse(key), data) } catch {}
+    }
+  })
+} catch {}
+
+// Persist successful query results to localStorage
+qc.getQueryCache().subscribe((event) => {
+  if (event?.type === 'updated' && event.query.state.status === 'success') {
+    try {
+      const saved = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')
+      saved[JSON.stringify(event.query.queryKey)] = { data: event.query.state.data, ts: Date.now() }
+      // Keep cache under 4MB — evict oldest entries if needed
+      const entries = Object.entries(saved).sort((a, b) => b[1].ts - a[1].ts).slice(0, 50)
+      localStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(entries)))
+    } catch {}
+  }
 })
 
 ReactDOM.createRoot(document.getElementById('root')).render(

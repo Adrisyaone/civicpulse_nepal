@@ -6,9 +6,12 @@ import toast from 'react-hot-toast'
 const Ctx = createContext(null)
 
 const LEVELS = {
+  // New simplified roles
+  citizen: 0, admin: 7, developer: 8,
+  // Legacy role names kept for backward compatibility
   nagarik: 0, samudaya_moderator: 1, wada_adhikrit: 2,
   palika_officer: 3, palika_pramukh: 4,
-  jilla_samanwayak: 5, pradesh_adhikrit: 6, admin: 7,
+  jilla_samanwayak: 5, pradesh_adhikrit: 6,
 }
 
 const VIEW_AS_KEY = 'nw_view_as'
@@ -23,14 +26,11 @@ export function AuthProvider({ children }) {
   const fetchProfile = useCallback(async (sbUser) => {
     if (!sbUser) { setProfile(null); return }
     try {
-      // Upsert handles find-or-create by google_uid then email.
-      // Existing users with a promoted role keep their role; new users start as nagarik.
       const data = await usersApi.upsert({
-        google_uid: sbUser.id,
-        name_en:    sbUser.user_metadata?.full_name || sbUser.email?.split('@')[0] || '',
-        name_np:    '',
-        email:      sbUser.email || '',
-        phone:      '',
+        supabase_uid: sbUser.id,
+        name:         sbUser.user_metadata?.full_name || sbUser.email?.split('@')[0] || '',
+        email:        sbUser.email || '',
+        phone:        '',
       })
       if (data && !data.error) { setProfile(data); return }
       throw new Error('upsert returned error')
@@ -104,7 +104,7 @@ export function AuthProvider({ children }) {
   }
 
   function toggleViewAs() {
-    const next = viewAs ? null : 'nagarik'
+    const next = viewAs ? null : 'citizen'
     setViewAsState(next)
     if (next) localStorage.setItem(VIEW_AS_KEY, next)
     else localStorage.removeItem(VIEW_AS_KEY)
@@ -113,17 +113,17 @@ export function AuthProvider({ children }) {
   // True role — what the user actually is in the backend
   const actualRole  = profile?.role || 'nagarik'
   const actualLevel = LEVELS[actualRole] ?? 0
-  // Only admins/officers can use view-as; ignore stored value if they were downgraded
-  const canViewAs   = actualLevel >= LEVELS.wada_adhikrit
+  // Only admin/developer can use view-as; ignore stored value if they were downgraded
+  const canViewAs   = actualLevel >= LEVELS.admin
 
   // Effective role — used for ALL permission checks in the UI
   const role  = (viewAs && canViewAs) ? viewAs : actualRole
   const level = LEVELS[role] ?? 0
 
   const hasPermission = (min) => level >= (LEVELS[min] ?? 0)
-  const isOfficer     = level >= LEVELS.wada_adhikrit
-  const isLead        = level >= LEVELS.palika_pramukh
-  const isAdmin       = role === 'admin'
+  const isOfficer     = level >= LEVELS.admin
+  const isLead        = level >= LEVELS.admin
+  const isAdmin       = role === 'admin' || role === 'developer'
 
   return (
     <Ctx.Provider value={{

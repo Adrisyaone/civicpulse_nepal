@@ -6,22 +6,14 @@ import { usersApi } from '../services/api'
 import { Spinner } from '../components/ui'
 import toast from 'react-hot-toast'
 
-const GENDERS = [
-  { value: 'male',   ne: 'पुरुष',       en: 'Male'   },
-  { value: 'female', ne: 'महिला',       en: 'Female' },
-  { value: 'other',  ne: 'अन्य',        en: 'Other'  },
-]
-
 export default function RegisterPage() {
   const { signUpWithEmail, signInWithGoogle } = useAuth()
   const { lang, tr } = useLang()
   const navigate = useNavigate()
-  const [f, setF] = useState({
-    name_np: '', name_en: '', email: '', phone: '',
-    gender: '', occupation: '', password: '', confirm: '',
-  })
+  const [f, setF] = useState({ name: '', email: '', phone: '', password: '', confirm: '' })
   const [busy, setBusy] = useState(false)
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
+  const L = (ne, en) => lang === 'ne' ? ne : en
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -29,18 +21,14 @@ export default function RegisterPage() {
     if (f.password.length < 8)    { toast.error(tr('pwMin'));      return }
     setBusy(true)
     try {
-      const { user } = await signUpWithEmail(f.email, f.password, f.name_en || f.name_np)
-      // Save extended profile to GAS immediately
+      const { user } = await signUpWithEmail(f.email, f.password, f.name)
       if (user) {
         await usersApi.upsert({
-          supabase_user_id: user.id,
-          name_np:    f.name_np,
-          name_en:    f.name_en,
-          email:      f.email,
-          phone:      f.phone,
-          gender:     f.gender,
-          occupation: f.occupation,
-          role:       'nagarik',
+          supabase_uid: user.id,
+          name:         f.name.trim(),
+          email:        f.email,
+          phone:        f.phone.trim(),
+          role:         'citizen',
         }).catch(() => {})
       }
       toast.success(tr('accountCreated'))
@@ -55,8 +43,6 @@ export default function RegisterPage() {
     catch (err) { toast.error(err.message); setBusy(false) }
   }
 
-  const L = (ne, en) => lang === 'ne' ? ne : en
-
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -66,13 +52,10 @@ export default function RegisterPage() {
           <h1 className="font-display font-bold text-xl text-white">
             {L('नागरिक खाता खोल्नुहोस्', 'Create Citizen Account')}
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
-            {L('नागरिक आवाजमा स्वागत छ', 'Welcome to NagarikAwaz')}
-          </p>
+          <p className="text-slate-500 text-sm mt-1">{L('नागरिक आवाजमा स्वागत छ', 'Welcome to NagarikAwaz')}</p>
         </div>
 
         <div className="card p-6 space-y-4">
-          {/* Google */}
           <button onClick={handleGoogle} disabled={busy} className="btn-ghost w-full justify-center py-2.5 gap-2">
             <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -90,53 +73,21 @@ export default function RegisterPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-3">
-            {/* Names */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">{tr('nameNp')}</label>
-                <input value={f.name_np} onChange={(e) => set('name_np', e.target.value)}
-                  className="input" placeholder="रामप्रसाद श्रेष्ठ" />
-              </div>
-              <div>
-                <label className="label">{tr('nameEn')}</label>
-                <input value={f.name_en} onChange={(e) => set('name_en', e.target.value)}
-                  className="input" placeholder="Ram Prasad" />
-              </div>
+            <div>
+              <label className="label">{L('नाम', 'Full Name')}</label>
+              <input value={f.name} onChange={(e) => set('name', e.target.value)}
+                className="input" placeholder={L('तपाईंको पूरा नाम', 'Your full name')} />
             </div>
-
-            {/* Email */}
             <div>
               <label className="label">{tr('email')} <span className="text-red-400">*</span></label>
               <input type="email" value={f.email} onChange={(e) => set('email', e.target.value)}
                 className="input" placeholder="tapai@example.com" required />
             </div>
-
-            {/* Phone */}
             <div>
               <label className="label">{tr('phone')}</label>
               <input type="tel" value={f.phone} onChange={(e) => set('phone', e.target.value)}
                 className="input" placeholder="98XXXXXXXX" />
             </div>
-
-            {/* Gender + Occupation */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">{L('लिङ्ग', 'Gender')}</label>
-                <select value={f.gender} onChange={(e) => set('gender', e.target.value)} className="input">
-                  <option value="">{L('छान्नुहोस्', 'Select…')}</option>
-                  {GENDERS.map((g) => (
-                    <option key={g.value} value={g.value}>{lang === 'ne' ? g.ne : g.en}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="label">{L('पेशा', 'Occupation')}</label>
-                <input value={f.occupation} onChange={(e) => set('occupation', e.target.value)}
-                  className="input" placeholder={L('किसान, शिक्षक…', 'Farmer, Teacher…')} />
-              </div>
-            </div>
-
-            {/* Passwords */}
             <div>
               <label className="label">{tr('password')} <span className="text-red-400">*</span></label>
               <input type="password" value={f.password} onChange={(e) => set('password', e.target.value)}
@@ -147,7 +98,6 @@ export default function RegisterPage() {
               <input type="password" value={f.confirm} onChange={(e) => set('confirm', e.target.value)}
                 className="input" placeholder="••••••••" required />
             </div>
-
             <button type="submit" disabled={busy} className="btn-nepal w-full justify-center py-2.5 mt-1">
               {busy ? <Spinner size="sm" /> : tr('createAccount')}
             </button>

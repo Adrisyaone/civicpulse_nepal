@@ -37,28 +37,28 @@ export const SEVERITIES = {
   low:      { en: 'Low',      np: 'सामान्य',    color: '#22c55e', bg: 'bg-green-500/20',  text: 'text-green-400',  dot: 'bg-green-500',  border: 'border-green-500/30'  },
 }
 
-// ── Statuses (Nepal govt terminology) ─────────────────────────────────────────
+// ── Statuses ───────────────────────────────────────────────────────────────────
 export const STATUSES = {
-  darta:               { en: 'Submitted',        np: 'दर्ता',                step: 0, color:'#8b5cf6', bg:'bg-violet-500/20', text:'text-violet-400' },
-  jaacha:              { en: 'Verification',     np: 'जाँच',                 step: 1, color:'#3b82f6', bg:'bg-blue-500/20',   text:'text-blue-400'   },
-  praapta:             { en: 'Verified',         np: 'प्राप्त',              step: 2, color:'#06b6d4', bg:'bg-cyan-500/20',   text:'text-cyan-400'   },
-  karyalaya_pathayeko: { en: 'Dept. Assigned',   np: 'कार्यालय पठाएको',     step: 3, color:'#f59e0b', bg:'bg-amber-500/20',  text:'text-amber-400'  },
-  kaarwaahi_bhairaha:  { en: 'In Progress',      np: 'कारबाही भइरहेको',    step: 4, color:'#f97316', bg:'bg-orange-500/20', text:'text-orange-400' },
-  aansik_samaadhaan:   { en: 'Partly Resolved',  np: 'आंशिक समाधान',       step: 5, color:'#84cc16', bg:'bg-lime-500/20',   text:'text-lime-400'   },
-  samaadhaan:          { en: 'Resolved',         np: 'समाधान',              step: 6, color:'#22c55e', bg:'bg-green-500/20',  text:'text-green-400'  },
-  banda:               { en: 'Closed',           np: 'बन्द',                 step: 7, color:'#6b7280', bg:'bg-gray-500/20',   text:'text-gray-400'   },
+  open:        { en: 'Open',        np: 'खुला',        step: 0, color:'#8b5cf6', bg:'bg-violet-500/20', text:'text-violet-400' },
+  in_progress: { en: 'In Progress', np: 'प्रक्रियामा', step: 4, color:'#f97316', bg:'bg-orange-500/20', text:'text-orange-400' },
+  resolved:    { en: 'Resolved',    np: 'समाधान',      step: 6, color:'#22c55e', bg:'bg-green-500/20',  text:'text-green-400'  },
+  closed:      { en: 'Closed',      np: 'बन्द',         step: 7, color:'#6b7280', bg:'bg-gray-500/20',   text:'text-gray-400'   },
 }
 
 // ── Roles ─────────────────────────────────────────────────────────────────────
 export const ROLES = {
-  nagarik:            { en: 'Citizen',             np: 'नागरिक',              level: 0, color: 'text-slate-400',  bg: 'bg-slate-500/20'  },
+  // Simplified roles (current system)
+  citizen:   { en: 'Citizen',       np: 'नागरिक',   level: 0, color: 'text-slate-400',  bg: 'bg-slate-500/20'  },
+  admin:     { en: 'Admin',         np: 'प्रशासक',  level: 7, color: 'text-red-400',    bg: 'bg-red-500/20'    },
+  developer: { en: 'Developer',     np: 'डेभलपर',   level: 8, color: 'text-purple-400', bg: 'bg-purple-500/20' },
+  // Legacy roles (backward compatibility)
+  nagarik:            { en: 'Citizen (legacy)',    np: 'नागरिक',              level: 0, color: 'text-slate-400',  bg: 'bg-slate-500/20'  },
   samudaya_moderator: { en: 'Community Moderator', np: 'समुदाय मध्यस्थकर्ता', level: 1, color: 'text-blue-400',   bg: 'bg-blue-500/20'   },
   wada_adhikrit:      { en: 'Ward Officer',        np: 'वडा अधिकृत',          level: 2, color: 'text-cyan-400',   bg: 'bg-cyan-500/20'   },
   palika_officer:     { en: 'Palika Officer',      np: 'पालिका अधिकारी',      level: 3, color: 'text-amber-400',  bg: 'bg-amber-500/20'  },
-  palika_pramukh:     { en: 'Mayor / Adhyaksha',  np: 'पालिका प्रमुख',       level: 4, color: 'text-brand-400',  bg: 'bg-brand-500/20'  },
-  jilla_samanwayak:   { en: 'District Coord.',    np: 'जिल्ला समन्वयक',      level: 5, color: 'text-violet-400', bg: 'bg-violet-500/20' },
-  pradesh_adhikrit:   { en: 'Province Officer',   np: 'प्रदेश अधिकृत',       level: 6, color: 'text-pink-400',   bg: 'bg-pink-500/20'   },
-  admin:              { en: 'Administrator',      np: 'प्रशासक',             level: 7, color: 'text-red-400',    bg: 'bg-red-500/20'    },
+  palika_pramukh:     { en: 'Mayor / Adhyaksha',   np: 'पालिका प्रमुख',       level: 4, color: 'text-brand-400',  bg: 'bg-brand-500/20'  },
+  jilla_samanwayak:   { en: 'District Coord.',     np: 'जिल्ला समन्वयक',      level: 5, color: 'text-violet-400', bg: 'bg-violet-500/20' },
+  pradesh_adhikrit:   { en: 'Province Officer',    np: 'प्रदेश अधिकृत',       level: 6, color: 'text-pink-400',   bg: 'bg-pink-500/20'   },
 }
 
 // ── Departments ───────────────────────────────────────────────────────────────

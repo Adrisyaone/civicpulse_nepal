@@ -1,9 +1,26 @@
-import React, { lazy, Suspense } from 'react'
+import React, { lazy, Suspense, useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { LangProvider, useLang } from './context/LangContext'
 import { ErrorBoundary, LoadingScreen } from './components/ui'
 import Navbar from './components/ui/Navbar'
+
+function OfflineBanner() {
+  const [online, setOnline] = useState(navigator.onLine)
+  useEffect(() => {
+    const on  = () => setOnline(true)
+    const off = () => setOnline(false)
+    window.addEventListener('online',  on)
+    window.addEventListener('offline', off)
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off) }
+  }, [])
+  if (online) return null
+  return (
+    <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 px-4 py-1.5 text-xs font-medium text-amber-200 bg-amber-900/90 border-b border-amber-700/60">
+      📴 Offline — showing cached data. Changes won't sync until you're back online.
+    </div>
+  )
+}
 
 const MapPage       = lazy(() => import('./pages/MapPage'))
 const FeedPage      = lazy(() => import('./pages/FeedPage'))
@@ -102,6 +119,7 @@ export default function App() {
     <ErrorBoundary>
       <LangProvider>
         <AuthProvider>
+          <OfflineBanner />
           <AppRoutes />
         </AuthProvider>
       </LangProvider>

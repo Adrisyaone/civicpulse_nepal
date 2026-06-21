@@ -14,13 +14,15 @@ export default function MyReportsPage() {
   const { data: all, isLoading } = useReports({})
   const [tab, setTab] = useState('open')
 
+  const myName = profile?.name || profile?.name_np || profile?.name_en || ''
   const mine = (all || []).filter((r) =>
-    r.submitter_email === user?.email ||
-    r.submitted_by    === (profile?.name_np || profile?.name_en)
+    r.submitted_by === profile?.id ||
+    r.submitted_by === user?.email ||
+    (myName && r.submitted_by === myName)
   )
   const tabs = {
-    open:     mine.filter((r) => !['samaadhaan','banda'].includes(r.status)),
-    resolved: mine.filter((r) =>  ['samaadhaan','banda'].includes(r.status)),
+    open:     mine.filter((r) => !['resolved','closed'].includes(r.status)),
+    resolved: mine.filter((r) =>  ['resolved','closed'].includes(r.status)),
     all:      mine,
   }
   const tabLabels = { open: { ne:'खुला', en:'Open' }, resolved: { ne:'समाधान', en:'Resolved' }, all: { ne:'सबै', en:'All' } }

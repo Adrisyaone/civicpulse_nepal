@@ -146,7 +146,7 @@ export default function ReportForm() {
       palika: palika || data.palika, palika_type: data.palika_type,
       ward_no: data.ward_no,
       photo_ids: photos.filter((p) => p.fileId).map((p) => p.fileId).join(','),
-      submitted_by:    profile?.name_np || profile?.name_en || user.email,
+      submitted_by:    profile?.name || profile?.name_np || profile?.name_en || user.email,
       submitter_phone: profile?.phone || '',
       status: 'darta',
     })

@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useReports } from '../hooks'
 import { useAuth } from '../context/AuthContext'
 import { useLang } from '../context/LangContext'
@@ -6,10 +7,42 @@ import { StatCard, Spinner, EmptyState } from '../components/ui'
 import ReportCard from '../components/reports/ReportCard'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { CATEGORIES, SEVERITIES, STATUSES, PROVINCES } from '../utils/constants'
-import { cn } from '../utils/helpers'
+import { driveThumb } from '../utils/helpers'
 
 const TT = {
   contentStyle: { background:'#0d1a0f', border:'1px solid #1f7350', borderRadius:'8px', color:'#e8f5ee', fontFamily:'Mukta' },
+}
+
+function PhotoCollage({ reports }) {
+  const navigate = useNavigate()
+  const photos = []
+  for (const r of reports) {
+    const ids = Array.isArray(r.photo_ids) ? r.photo_ids : (r.photo_ids || '').split(',').filter(Boolean)
+    for (const fid of ids) {
+      photos.push({ fid, reportId: r.id, title: r.title || '' })
+      if (photos.length >= 24) break
+    }
+    if (photos.length >= 24) break
+  }
+  if (photos.length === 0) return null
+  return (
+    <div className="mb-6">
+      <h2 className="font-display font-semibold text-slate-300 text-sm mb-3">📸 Recent Photos</h2>
+      <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">
+        {photos.map(({ fid, reportId, title }, i) => (
+          <div key={`${fid}-${i}`} onClick={() => navigate(`/report/${reportId}`)}
+            className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-brand-500 bg-slate-800 relative group">
+            <img
+              src={driveThumb(fid, 200)}
+              alt={title}
+              className="w-full h-full object-cover transition-transform group-hover:scale-105"
+              onError={(e) => { e.target.parentElement.style.display = 'none' }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export default function DashboardPage() {
@@ -18,8 +51,8 @@ export default function DashboardPage() {
   const [province, setProvince] = useState(profile?.province || '')
   const { data: reports, isLoading } = useReports({ province })
 
-  const open     = (reports||[]).filter((r)=>!['samaadhaan','banda'].includes(r.status))
-  const critical = (reports||[]).filter((r)=>r.severity==='critical'&&!['samaadhaan','banda'].includes(r.status))
+  const open     = (reports||[]).filter((r)=>!['resolved','closed'].includes(r.status))
+  const critical = (reports||[]).filter((r)=>r.severity==='critical'&&!['resolved','closed'].includes(r.status))
 
   const catData = Object.entries(CATEGORIES).map(([k,v])=>({
     name: lang==='ne'?v.np:v.en,
@@ -56,7 +89,7 @@ export default function DashboardPage() {
         <StatCard labelKey="totalReports"  value={reports?.length??'—'} icon="📋" loading={isLoading} color="text-white" />
         <StatCard labelKey="openIssues"    value={open.length}          icon="🔓" loading={isLoading} color="text-orange-400" />
         <StatCard labelKey="critical"      value={critical.length}      icon="🚨" loading={isLoading} color="text-red-400" />
-        <StatCard labelKey="resolvedStat"  value={(reports||[]).filter((r)=>r.status==='samaadhaan').length} icon="✅" loading={isLoading} color="text-brand-400" />
+        <StatCard labelKey="resolvedStat"  value={(reports||[]).filter((r)=>r.status==='resolved').length} icon="✅" loading={isLoading} color="text-brand-400" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
@@ -116,6 +149,9 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Photo collage */}
+      {!isLoading && <PhotoCollage reports={reports || []} />}
 
       {critical.length > 0 && (
         <div className="mb-6">

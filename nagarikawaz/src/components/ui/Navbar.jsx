@@ -17,7 +17,6 @@ export default function Navbar() {
     { to: '/',               k: 'map',           icon: '🗺️', show: true      },
     { to: '/dashboard',      k: 'dashboard',     icon: '📈', show: true      },
     { to: '/weekly-reports', k: 'weeklySummary', icon: '📊', show: true      },
-    { to: '/report/new',     k: 'report',        icon: '➕', show: true      },
     { to: '/ai-reports',     k: 'aiReports',     icon: '✨', show: isLead    },
     { to: '/admin',          k: 'admin',         icon: '⚙️', show: isAdmin   },
   ].filter((l) => l.show)
@@ -27,8 +26,6 @@ export default function Navbar() {
     { to: '/',               k: 'map',          icon: '🗺️', show: true      },
     { to: '/dashboard',      k: 'dashboard',    icon: '📈', show: true      },
     { to: '/weekly-reports', k: 'weeklySummary',icon: '📊', show: true      },
-    { to: '/report/new',     k: 'report',       icon: '➕', show: true      },
-    { to: '/feed',           k: 'news',         icon: '📰', show: true      },
     { to: '/ai-reports',     k: 'aiReports',    icon: '✨', show: isLead    },
     { to: '/admin',          k: 'admin',        icon: '⚙️', show: isAdmin   },
   ].filter((l) => l.show)
@@ -55,10 +52,10 @@ export default function Navbar() {
       {viewAs && (
         <div className="flex items-center justify-center gap-3 px-4 py-1 text-xs font-medium"
           style={{ background: 'linear-gradient(90deg, #7c3aed22, #7c3aed44, #7c3aed22)', borderBottom: '1px solid #7c3aed55' }}>
-          <span className="text-purple-300">👤 Viewing as Citizen (nagarik)</span>
+          <span className="text-purple-300">👤 Viewing as Citizen</span>
           <button onClick={toggleViewAs}
             className="px-2 py-0.5 rounded text-purple-200 bg-purple-900/60 border border-purple-700/60 hover:bg-purple-800/60 transition-all text-[11px]">
-            Return to {actualRole === 'admin' ? 'Admin' : 'Officer'} View
+            Return to {actualRole === 'developer' ? 'Developer' : 'Admin'} View
           </button>
         </div>
       )}
@@ -102,10 +99,10 @@ export default function Navbar() {
               <button onClick={() => setMenu(!menu)}
                 className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-all">
                 <div className="w-7 h-7 rounded-full bg-brand-800 border border-brand-700 flex items-center justify-center text-xs font-bold text-brand-300">
-                  {((profile?.name_np || profile?.name_en || profile?.email || '?')[0] || '?').toUpperCase()}
+                  {((profile?.name || profile?.name_np || profile?.name_en || profile?.email || '?')[0] || '?').toUpperCase()}
                 </div>
                 <span className="hidden sm:block text-sm text-slate-300 max-w-[90px] truncate">
-                  {profile?.name_np || profile?.name_en || user.email}
+                  {profile?.name || profile?.name_np || profile?.name_en || user.email}
                 </span>
                 <span className="text-slate-600 text-xs">▾</span>
               </button>
@@ -116,7 +113,7 @@ export default function Navbar() {
                   <div className="absolute right-0 top-full mt-2 w-56 card py-1 shadow-xl z-50 animate-fade-in">
                     <div className="px-4 py-3 border-b border-slate-800">
                       <p className="text-sm font-medium text-slate-200 truncate">
-                        {profile?.name_np || profile?.name_en || '—'}
+                        {profile?.name || profile?.name_np || profile?.name_en || '—'}
                       </p>
                       <p className="text-xs text-slate-500 truncate">{user.email}</p>
                       {profile?.palika && (

@@ -13,9 +13,10 @@ export default function ReportCard({ report: r, compact = false }) {
   const { lang, tr } = useLang()
   const upvote      = useUpvoteReport()
   const progress    = statusToProgress(r.status)
-  const photoId     = r.photo_ids?.split(',')[0]
-  const title       = lang === 'ne' ? (r.title_np || r.title_en) : (r.title_en || r.title_np)
-  const desc        = lang === 'ne' ? (r.description_np || r.description_en) : (r.description_en || r.description_np)
+  const photoIds    = Array.isArray(r.photo_ids) ? r.photo_ids : (r.photo_ids || '').split(',').filter(Boolean)
+  const photoId     = photoIds[0]
+  const title       = lang === 'ne' ? (r.title_np || r.title_en || r.title) : (r.title_en || r.title_np || r.title)
+  const desc        = lang === 'ne' ? (r.description_np || r.description_en || r.description) : (r.description_en || r.description_np || r.description)
 
   function handleUpvote(e) {
     e.stopPropagation()

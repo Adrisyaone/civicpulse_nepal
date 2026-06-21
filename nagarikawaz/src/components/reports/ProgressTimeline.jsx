@@ -12,16 +12,14 @@ export default function ProgressTimeline({ reportId }) {
   const { data: updates, isLoading } = useProgress(reportId)
   const addProgress = useAddProgress()
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ status: '', progress_percent: 0, note_np: '', note_en: '', department: '' })
+  const [form, setForm] = useState({ status: '', note: '', department: '' })
+
+  const myName = profile?.name || profile?.name_np || profile?.name_en || user?.email || 'Officer'
 
   async function handleSubmit(e) {
     e.preventDefault()
-    await addProgress.mutateAsync({
-      reportId,
-      officer: profile?.name_np || profile?.name_en || user?.email || 'Officer',
-      ...form,
-    })
-    setForm({ status: '', progress_percent: 0, note_np: '', note_en: '', department: '' })
+    await addProgress.mutateAsync({ reportId, officer: myName, ...form })
+    setForm({ status: '', note: '', department: '' })
     setOpen(false)
   }
 
@@ -53,31 +51,19 @@ export default function ProgressTimeline({ reportId }) {
               </select>
             </div>
             <div>
-              <label className="label">{tr('progress')} ({form.progress_percent}%)</label>
-              <input type="range" min="0" max="100" step="5"
-                value={form.progress_percent}
-                onChange={(e) => setForm((f) => ({ ...f, progress_percent: +e.target.value }))}
-                className="w-full mt-2.5 accent-brand-500" />
+              <label className="label">{tr('department')}</label>
+              <select value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
+                className="input text-sm">
+                <option value="">{tr('selectOpt')}</option>
+                {DEPARTMENTS.map((d) => <option key={d.en} value={d.en}>{lang === 'ne' ? d.np : d.en}</option>)}
+              </select>
             </div>
           </div>
           <div>
-            <label className="label">{tr('department')}</label>
-            <select value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
-              className="input text-sm">
-              <option value="">{tr('selectOpt')}</option>
-              {DEPARTMENTS.map((d) => <option key={d.en} value={d.en}>{lang === 'ne' ? d.np : d.en}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="label">{tr('noteNpLabel')}</label>
-            <textarea value={form.note_np} onChange={(e) => setForm((f) => ({ ...f, note_np: e.target.value }))}
-              className="input text-sm resize-none" rows={2}
-              placeholder={tr('progressDescPH')} required />
-          </div>
-          <div>
-            <label className="label">{lang === 'ne' ? 'Note (English)' : 'Note (English)'}</label>
-            <textarea value={form.note_en} onChange={(e) => setForm((f) => ({ ...f, note_en: e.target.value }))}
-              className="input text-sm resize-none" rows={2} placeholder="Progress description (English)…" />
+            <label className="label">{lang === 'ne' ? 'टिप्पणी' : 'Note'}</label>
+            <textarea value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+              className="input text-sm resize-none" rows={3}
+              placeholder={lang === 'ne' ? 'प्रगति विवरण लेख्नुहोस्…' : 'Describe the progress update…'} required />
           </div>
           <div className="flex gap-2 justify-end">
             <button type="button" className="btn-ghost py-1.5 text-sm" onClick={() => setOpen(false)}>{tr('cancel')}</button>
@@ -97,7 +83,7 @@ export default function ProgressTimeline({ reportId }) {
           <div className="absolute left-2 top-2 bottom-2 w-px bg-slate-800" />
           <div className="space-y-5">
             {updates.map((u, i) => {
-              const note = lang === 'ne' ? (u.note_np || u.note_en) : (u.note_en || u.note_np)
+              const note = u.note || u.note_np || u.note_en || ''
               return (
                 <div key={u.id || i} className="relative">
                   <div className={cn('absolute -left-4 w-4 h-4 rounded-full border-2 border-[#060e08]',
@@ -105,13 +91,12 @@ export default function ProgressTimeline({ reportId }) {
                   <div className="card p-3">
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <StatusBadge status={u.status} />
-                      {u.progress_percent > 0 && <span className="text-xs text-slate-500 font-mono">{u.progress_percent}%</span>}
                       {u.department && <span className="text-xs text-slate-500">· {u.department}</span>}
                     </div>
                     {note && <p className="text-sm text-slate-300 mb-2 leading-relaxed">{note}</p>}
                     <div className="flex justify-between text-xs text-slate-600">
-                      <span>{u.officer}</span>
-                      <span>{formatDate(u.timestamp)}</span>
+                      <span>{u.officer_name || u.officer}</span>
+                      <span>{formatDate(u.created_at || u.timestamp)}</span>
                     </div>
                   </div>
                 </div>
